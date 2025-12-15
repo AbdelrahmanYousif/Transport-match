@@ -1,13 +1,14 @@
 from datetime import datetime, timedelta
 from jose import jwt, JWTError
 from passlib.context import CryptContext
+import os
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # JWT settings
 ALGORITHM = "HS256"
-SECRET_KEY = "change-me-to-a-long-random-string"  # byt senare till något långt slumpmässigt
+SECRET_KEY = os.getenv("SECRET_KEY", "dev-only-change-me")
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 dagar
 
 
