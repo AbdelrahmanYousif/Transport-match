@@ -1,9 +1,7 @@
-from __future__ import annotations
-
+import datetime as dt
+from datetime import datetime
 from enum import Enum
-from datetime import datetime, date
 from typing import Optional
-
 from sqlmodel import SQLModel, Field
 
 
@@ -52,18 +50,20 @@ class Trip(SQLModel, table=True):
 
     origin: str
     destination: str
-    date: Optional[date] = None          # <-- detta funkar nu (date importeras)
-    time_window: Optional[str] = None
-    compensation_sek: int = 0
-    vehicle_info: Optional[str] = None
 
-    status: TripStatus = TripStatus.OPEN
+    date: Optional[dt.date] = Field(default=None)
+    time_window: Optional[str] = Field(default=None)
+
+    compensation_sek: int = Field(default=0)
+    vehicle_info: Optional[str] = Field(default=None)
+
+    status: TripStatus = Field(default=TripStatus.OPEN)
 
 
 class TripCreate(SQLModel):
     origin: str
     destination: str
-    date: Optional[date] = None
+    date: Optional[dt.date] = None
     time_window: Optional[str] = None
     compensation_sek: int = 0
     vehicle_info: Optional[str] = None
@@ -73,7 +73,7 @@ class TripPublic(SQLModel):
     id: int
     origin: str
     destination: str
-    date: Optional[date] = None
+    date: Optional[dt.date] = None
     time_window: Optional[str] = None
     compensation_sek: int
     vehicle_info: Optional[str] = None
