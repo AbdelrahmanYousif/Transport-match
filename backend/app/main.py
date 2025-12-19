@@ -3,10 +3,12 @@ from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlmodel import Session, select
+from typing import List
 
 from .db import create_db_and_tables, get_session
 from .models import User, UserCreate, UserPublic
 from .auth import hash_password, verify_password, create_access_token, decode_token
+from .models import UserRole
 
 app = FastAPI(title="Transport Match API")
 
@@ -77,7 +79,7 @@ def create_trip(
     user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    if user.role != "COMPANY":
+    if user.role != UserRole.COMPANY:
         raise HTTPException(status_code=403, detail="Endast företag kan skapa körningar")
 
     trip = Trip(
