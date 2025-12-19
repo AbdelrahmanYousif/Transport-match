@@ -1,3 +1,4 @@
+from .models import User, UserCreate, UserPublic, Trip, TripCreate, TripPublic
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -69,3 +70,32 @@ def get_current_user(token: str = Depends(oauth2_scheme), session: Session = Dep
 @app.get("/me", response_model=UserPublic)
 def me(user: User = Depends(get_current_user)):
     return UserPublic(**user.model_dump())
+
+@app.post("/trips", response_model=TripPublic)
+def create_trip(
+    payload: TripCreate,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    if user.role != "COMPANY":
+        raise HTTPException(status_code=403, detail="Endast företag kan skapa körningar")
+
+    trip = Trip(
+        company_id=user.id,
+        origin=payload.origin,
+        destination=payload.destination,
+        date=payload.date,
+        time_window=payload.time_window,
+        compensation_sek=payload.compensation_sek,
+        vehicle_info=payload.vehicle_info,
+    )
+    session.add(trip)
+    session.commit()
+    session.refresh(trip)
+    return TripPublic(**trip.model_dump())
+
+
+@app.get("/trips", response_model=list[TripPublic])
+def list_open_trips(session: Session = Depends(get_session)):
+    trips = session.exec(select(Trip).where(Trip.status == "OPEN")).all()
+    return [TripPublic(**t.model_dump()) for t in trips]
