@@ -1,22 +1,24 @@
-from .models import User, UserCreate, UserPublic, Trip, TripCreate, TripPublic
+from typing import List
+
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from sqlmodel import Session, select
-from typing import List
 from sqlalchemy.exc import IntegrityError
+from sqlmodel import Session, select
 
-
-from .db import create_db_and_tables, get_session
-from .models import User, UserCreate, UserPublic, Reservation, TripStatus, UserRole
 from .auth import hash_password, verify_password, create_access_token, decode_token
-from .models import UserRole
+from .db import create_db_and_tables, get_session
+from .models import (
+    User, UserCreate, UserPublic, UserRole,
+    Trip, TripCreate, TripPublic, TripStatus,
+    Reservation,
+)
 
 app = FastAPI(title="Transport Match API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["*"],  # lås senare till din frontend domän
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -24,13 +26,16 @@ app.add_middleware(
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
+
 @app.on_event("startup")
 def on_startup():
     create_db_and_tables()
 
+
 @app.get("/health")
 def health():
     return {"ok": True}
+
 
 @app.post("/auth/signup")
 def signup(payload: UserCreate, session: Session = Depends(get_session)):
@@ -51,6 +56,7 @@ def signup(payload: UserCreate, session: Session = Depends(get_session)):
     token = create_access_token(str(user.id))
     return {"access_token": token, "token_type": "bearer", "user": UserPublic(**user.model_dump())}
 
+
 @app.post("/auth/login")
 def login(form: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
     user = session.exec(select(User).where(User.email == form.username)).first()
@@ -59,6 +65,7 @@ def login(form: OAuth2PasswordRequestForm = Depends(), session: Session = Depend
 
     token = create_access_token(str(user.id))
     return {"access_token": token, "token_type": "bearer"}
+
 
 def get_current_user(token: str = Depends(oauth2_scheme), session: Session = Depends(get_session)) -> User:
     try:
@@ -71,9 +78,11 @@ def get_current_user(token: str = Depends(oauth2_scheme), session: Session = Dep
         raise HTTPException(status_code=401, detail="Användare hittades inte")
     return user
 
+
 @app.get("/me", response_model=UserPublic)
 def me(user: User = Depends(get_current_user)):
     return UserPublic(**user.model_dump())
+
 
 @app.post("/trips", response_model=TripPublic)
 def create_trip(
@@ -99,9 +108,9 @@ def create_trip(
     return TripPublic(**trip.model_dump())
 
 
-@app.get("/trips", response_model=list[TripPublic])
+@app.get("/trips", response_model=List[TripPublic])
 def list_open_trips(session: Session = Depends(get_session)):
-    trips = session.exec(select(Trip).where(Trip.status == "OPEN")).all()
+    trips = session.exec(select(Trip).where(Trip.status == TripStatus.OPEN)).all()
     return [TripPublic(**t.model_dump()) for t in trips]
 
 
@@ -118,16 +127,4 @@ def reserve_trip(
     if not trip:
         raise HTTPException(status_code=404, detail="Trip finns inte")
     if trip.status != TripStatus.OPEN:
-        raise HTTPException(status_code=400, detail="Trip är inte ledig")
-
-    try:
-        res = Reservation(trip_id=trip_id, driver_id=user.id)
-        session.add(res)
-        trip.status = TripStatus.RESERVED
-        session.add(trip)
-        session.commit()
-        return {"ok": True, "trip_id": trip_id, "driver_id": user.id}
-    except IntegrityError:
-        session.rollback()
-        raise HTTPException(status_code=400, detail="Trip är redan paxad")
-
+        raise HTTPException(status_code=400, detail=_
