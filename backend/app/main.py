@@ -4,9 +4,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlmodel import Session, select
 from typing import List
+from sqlalchemy.exc import IntegrityError
+
 
 from .db import create_db_and_tables, get_session
-from .models import User, UserCreate, UserPublic
+from .models import User, UserCreate, UserPublic, Reservation, TripStatus, UserRole
 from .auth import hash_password, verify_password, create_access_token, decode_token
 from .models import UserRole
 
@@ -101,3 +103,31 @@ def create_trip(
 def list_open_trips(session: Session = Depends(get_session)):
     trips = session.exec(select(Trip).where(Trip.status == "OPEN")).all()
     return [TripPublic(**t.model_dump()) for t in trips]
+
+
+@app.post("/trips/{trip_id}/reserve")
+def reserve_trip(
+    trip_id: int,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    if user.role != UserRole.DRIVER:
+        raise HTTPException(status_code=403, detail="Endast drivers kan paxa körningar")
+
+    trip = session.get(Trip, trip_id)
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip finns inte")
+    if trip.status != TripStatus.OPEN:
+        raise HTTPException(status_code=400, detail="Trip är inte ledig")
+
+    try:
+        res = Reservation(trip_id=trip_id, driver_id=user.id)
+        session.add(res)
+        trip.status = TripStatus.RESERVED
+        session.add(trip)
+        session.commit()
+        return {"ok": True, "trip_id": trip_id, "driver_id": user.id}
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(status_code=400, detail="Trip är redan paxad")
+

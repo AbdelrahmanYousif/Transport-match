@@ -78,3 +78,8 @@ class TripPublic(SQLModel):
     compensation_sek: int
     vehicle_info: Optional[str] = None
     status: TripStatus
+
+class Reservation(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    trip_id: int = Field(foreign_key="trip.id", index=True, unique=True)
+    driver_id: int = Field(foreign_key="user.id", index=True)
