@@ -76,6 +76,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), session: Session = Dep
     user = session.get(User, user_id)
     if not user:
         raise HTTPException(status_code=401, detail="Användare hittades inte")
+
     return user
 
 
@@ -126,5 +127,19 @@ def reserve_trip(
     trip = session.get(Trip, trip_id)
     if not trip:
         raise HTTPException(status_code=404, detail="Trip finns inte")
+
     if trip.status != TripStatus.OPEN:
-        raise HTTPException(status_code=400, detail=_
+        raise HTTPException(status_code=400, detail="Trip är inte ledig")
+
+    try:
+        res = Reservation(trip_id=trip_id, driver_id=user.id)
+        session.add(res)
+
+        trip.status = TripStatus.RESERVED
+        session.add(trip)
+
+        session.commit()
+        return {"ok": True, "trip_id": trip_id, "driver_id": user.id}
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(status_code=400, detail="Trip är redan paxad")
