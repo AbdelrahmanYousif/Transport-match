@@ -6,10 +6,20 @@ import Home from "./pages/Home";
 import Auth from "./pages/Auth";
 import Explore from "./pages/Explore";
 import CreateTrip from "./pages/CreateTrip";
+import MyTrips from "./pages/MyTrips";
+
 
 function Nav({ me, onLogout }: { me: Me | null; onLogout: () => void }) {
   return (
-    <div style={{ padding: 16, borderBottom: "1px solid #eee", display: "flex", gap: 12, alignItems: "center" }}>
+    <div
+      style={{
+        padding: 16,
+        borderBottom: "1px solid #eee",
+        display: "flex",
+        gap: 12,
+        alignItems: "center",
+      }}
+    >
       <Link to="/" style={{ fontWeight: 700, textDecoration: "none" }}>
         Transport Match
       </Link>
@@ -21,6 +31,8 @@ function Nav({ me, onLogout }: { me: Me | null; onLogout: () => void }) {
           <span style={{ fontSize: 14 }}>
             {me.name} — <b>{me.role}</b>
           </span>
+
+          <Link to="/mine">Mina körningar</Link>
 
           {me.role === "DRIVER" && <Link to="/explore">Explore</Link>}
           {me.role === "COMPANY" && <Link to="/create">Create Trip</Link>}
@@ -92,6 +104,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home me={me} />} />
           <Route path="/auth" element={<Auth onAuthed={(m) => setMe(m)} />} />
+          <Route path="/mine" element={<MyTrips />} />
 
           <Route
             path="/explore"
