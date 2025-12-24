@@ -7,6 +7,7 @@ import Auth from "./pages/Auth";
 import Explore from "./pages/Explore";
 import CreateTrip from "./pages/CreateTrip";
 import MyTrips from "./pages/MyTrips";
+import TripDetailPage from "./pages/TripDetail";
 
 
 function Nav({ me, onLogout }: { me: Me | null; onLogout: () => void }) {
@@ -105,6 +106,7 @@ export default function App() {
           <Route path="/" element={<Home me={me} />} />
           <Route path="/auth" element={<Auth onAuthed={(m) => setMe(m)} />} />
           <Route path="/mine" element={<MyTrips />} />
+          <Route path="/trips/:id" element={<TripDetailPage />} />
 
           <Route
             path="/explore"

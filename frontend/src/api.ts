@@ -62,8 +62,11 @@ export const apiPostJson = <T,>(path: string, body?: unknown) =>
   request<T>(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: body ? JSON.stringify(body) : undefined,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
   });
+
+// Alias så att sidor kan importera apiPost (som vi använde i TripDetail.tsx)
+export const apiPost = apiPostJson;
 
 // FastAPI OAuth2PasswordRequestForm kräver x-www-form-urlencoded
 export const apiPostForm = <T,>(path: string, form: Record<string, string>) => {
@@ -77,11 +80,16 @@ export const apiPostForm = <T,>(path: string, form: Record<string, string>) => {
   });
 };
 
+export async function apiDelete<T>(path: string): Promise<T> {
+  return request<T>(path, { method: "DELETE" });
+}
+
 // --- Typer vi återanvänder i pages ---
 export type UserRole = "DRIVER" | "COMPANY";
 export type Me = { id: number; name: string; email: string; role: UserRole };
 
 export type TripStatus = "OPEN" | "RESERVED" | "COMPLETED" | "CANCELLED";
+
 export type Trip = {
   id: number;
   origin: string;
@@ -91,4 +99,16 @@ export type Trip = {
   compensation_sek: number;
   vehicle_info: string | null;
   status: TripStatus;
+};
+
+export type UserPublic = {
+  id: number;
+  name: string;
+  email: string;
+  role: UserRole;
+};
+
+export type TripDetail = {
+  trip: Trip;
+  reserved_driver: UserPublic | null;
 };

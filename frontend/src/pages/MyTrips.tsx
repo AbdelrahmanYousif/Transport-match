@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiGet, type Trip } from "../api";
+import { Link } from "react-router-dom";
 
 export default function MyTrips() {
   const [items, setItems] = useState<Trip[]>([]);
@@ -48,7 +49,7 @@ export default function MyTrips() {
               }}
             >
               <div style={{ fontWeight: 700 }}>
-                #{t.id} {t.origin} → {t.destination}
+                <Link to={`/trips/${t.id}`}>#{t.id}</Link> {t.origin} → {t.destination}
               </div>
               <div>
                 Datum: {t.date ?? "-"} | Tid: {t.time_window ?? "-"}
