@@ -11,7 +11,7 @@ from .db import create_db_and_tables, get_session
 from .models import (
     User, UserCreate, UserPublic, UserRole,
     Trip, TripCreate, TripPublic, TripStatus,
-    Reservation,
+    Reservation, TripDetailPublic
 )
 
 app = FastAPI(title="Transport Match API")
@@ -163,3 +163,115 @@ def my_trips(
         ).all()
 
     return [TripPublic(**t.model_dump()) for t in trips]
+
+
+@app.get("/trips/{trip_id}", response_model=TripDetailPublic)
+def get_trip(
+    trip_id: int,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    trip = session.get(Trip, trip_id)
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip finns inte")
+
+    reserved_driver = None
+    if trip.status == TripStatus.RESERVED:
+        res = session.exec(select(Reservation).where(Reservation.trip_id == trip_id)).first()
+
+        # Bara företaget som äger trippen får se vem som paxat
+        if res and user.role == UserRole.COMPANY and trip.company_id == user.id:
+            driver = session.get(User, res.driver_id)
+            if driver:
+                reserved_driver = UserPublic(**driver.model_dump())
+
+    return TripDetailPublic(
+        trip=TripPublic(**trip.model_dump()),
+        reserved_driver=reserved_driver,
+    )
+
+
+@app.delete("/trips/{trip_id}/reserve")
+def unreserve_trip(
+    trip_id: int,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    if user.role != UserRole.DRIVER:
+        raise HTTPException(status_code=403, detail="Endast drivers kan avboka")
+
+    trip = session.get(Trip, trip_id)
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip finns inte")
+
+    if trip.status != TripStatus.RESERVED:
+        raise HTTPException(status_code=400, detail="Trip är inte paxad")
+
+    res = session.exec(select(Reservation).where(Reservation.trip_id == trip_id)).first()
+    if not res:
+        raise HTTPException(status_code=404, detail="Reservation saknas")
+
+    if res.driver_id != user.id:
+        raise HTTPException(status_code=403, detail="Du har inte paxat denna trip")
+
+    session.delete(res)
+    trip.status = TripStatus.OPEN
+    session.add(trip)
+    session.commit()
+
+    return {"ok": True, "trip_id": trip_id}
+
+
+@app.post("/trips/{trip_id}/complete")
+def complete_trip(
+    trip_id: int,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    if user.role != UserRole.COMPANY:
+        raise HTTPException(status_code=403, detail="Endast företag kan markera completed")
+
+    trip = session.get(Trip, trip_id)
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip finns inte")
+
+    if trip.company_id != user.id:
+        raise HTTPException(status_code=403, detail="Inte din trip")
+
+    if trip.status != TripStatus.RESERVED:
+        raise HTTPException(status_code=400, detail="Trip måste vara RESERVED för att slutföras")
+
+    trip.status = TripStatus.COMPLETED
+    session.add(trip)
+    session.commit()
+    return {"ok": True, "trip_id": trip_id, "status": trip.status}
+
+
+@app.post("/trips/{trip_id}/cancel")
+def cancel_trip(
+    trip_id: int,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    if user.role != UserRole.COMPANY:
+        raise HTTPException(status_code=403, detail="Endast företag kan avboka")
+
+    trip = session.get(Trip, trip_id)
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip finns inte")
+
+    if trip.company_id != user.id:
+        raise HTTPException(status_code=403, detail="Inte din trip")
+
+    if trip.status not in (TripStatus.OPEN, TripStatus.RESERVED):
+        raise HTTPException(status_code=400, detail="Trip kan inte avbokas i nuvarande status")
+
+    # om den var paxad: ta bort reservationen
+    res = session.exec(select(Reservation).where(Reservation.trip_id == trip_id)).first()
+    if res:
+        session.delete(res)
+
+    trip.status = TripStatus.CANCELLED
+    session.add(trip)
+    session.commit()
+    return {"ok": True, "trip_id": trip_id, "status": trip.status}

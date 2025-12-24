@@ -83,3 +83,8 @@ class Reservation(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     trip_id: int = Field(foreign_key="trip.id", index=True, unique=True)
     driver_id: int = Field(foreign_key="user.id", index=True)
+
+class TripDetailPublic(SQLModel):
+    trip: TripPublic
+    reserved_driver: Optional[UserPublic] = None
+
