@@ -143,3 +143,23 @@ def reserve_trip(
     except IntegrityError:
         session.rollback()
         raise HTTPException(status_code=400, detail="Trip är redan paxad")
+    
+
+@app.get("/trips/mine", response_model=List[TripPublic])
+def my_trips(
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    if user.role == UserRole.COMPANY:
+        trips = session.exec(
+            select(Trip).where(Trip.company_id == user.id).order_by(Trip.id.desc())
+        ).all()
+    else:
+        trips = session.exec(
+            select(Trip)
+            .join(Reservation, Reservation.trip_id == Trip.id)
+            .where(Reservation.driver_id == user.id)
+            .order_by(Trip.id.desc())
+        ).all()
+
+    return [TripPublic(**t.model_dump()) for t in trips]
