@@ -1,6 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { apiDelete, apiGet, apiPost, type TripDetail } from "../api";
+import { apiDelete, apiGet, apiPost, type TripDetail, type Me } from "../api";
+import { Alert, Badge, Button, Card, Container, Divider, H1, Muted, Row, Spacer } from "../ui";
+
+function statusTone(status: string) {
+  if (status === "COMPLETED") return "success";
+  if (status === "RESERVED") return "warning";
+  if (status === "CANCELLED") return "danger";
+  return "neutral"; // OPEN
+}
 
 export default function TripDetailPage() {
   const { id } = useParams();
@@ -8,15 +16,23 @@ export default function TripDetailPage() {
   const nav = useNavigate();
 
   const [data, setData] = useState<TripDetail | null>(null);
+  const [me, setMe] = useState<Me | null>(null);
   const [loading, setLoading] = useState(false);
+  const [action, setAction] = useState<null | "reserve" | "unreserve" | "complete" | "cancel">(null);
   const [err, setErr] = useState<string | null>(null);
 
   async function load() {
     try {
       setLoading(true);
       setErr(null);
-      const d = await apiGet<TripDetail>(`/trips/${tripId}`);
+
+      const [d, m] = await Promise.all([
+        apiGet<TripDetail>(`/trips/${tripId}`),
+        apiGet<Me>("/me"),
+      ]);
+
       setData(d);
+      setMe(m);
     } catch (e) {
       setErr(String(e));
     } finally {
@@ -30,90 +46,132 @@ export default function TripDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tripId]);
 
-  async function onComplete() {
+  async function runAction(key: typeof action, fn: () => Promise<void>) {
     try {
       setErr(null);
-      await apiPost(`/trips/${tripId}/complete`, {});
+      setAction(key);
+      await fn();
       await load();
     } catch (e) {
       setErr(String(e));
+    } finally {
+      setAction(null);
     }
   }
 
-  async function onCancel() {
-    try {
-      setErr(null);
-      await apiPost(`/trips/${tripId}/cancel`, {});
-      await load();
-    } catch (e) {
-      setErr(String(e));
-    }
+  if (!Number.isFinite(tripId)) {
+    return (
+      <Container>
+        <Alert>Ogiltigt trip-id.</Alert>
+      </Container>
+    );
   }
-
-  async function onUnreserve() {
-    try {
-      setErr(null);
-      await apiDelete(`/trips/${tripId}/reserve`);
-      await load();
-    } catch (e) {
-      setErr(String(e));
-    }
-  }
-
-  if (!Number.isFinite(tripId)) return <p>Ogiltigt trip-id.</p>;
 
   return (
-    <div>
-      <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 12 }}>
-        <button onClick={() => nav(-1)}>← Tillbaka</button>
+    <Container maxWidth={880}>
+      <Row style={{ marginBottom: 12 }}>
+        <Button variant="secondary" onClick={() => nav(-1)}>
+          ← Tillbaka
+        </Button>
+
         <Link to="/mine">Mina körningar</Link>
         <Link to="/explore">Explore</Link>
-      </div>
 
-      <h1 style={{ marginTop: 0 }}>Trip #{tripId}</h1>
+        <Spacer />
+      </Row>
 
-      {loading && <p>Laddar...</p>}
-      {err && <p style={{ color: "crimson" }}>Error: {err}</p>}
+      <H1>Trip #{tripId}</H1>
 
-      {data && (
-        <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 14 }}>
-          <div style={{ fontWeight: 700, fontSize: 18 }}>
-            {data.trip.origin} → {data.trip.destination}
-          </div>
+      {loading && <Muted>Laddar...</Muted>}
 
-          <div style={{ marginTop: 6 }}>
-            Datum: {data.trip.date ?? "-"} | Tid: {data.trip.time_window ?? "-"}
-          </div>
-
-          <div>Ersättning: {data.trip.compensation_sek} SEK</div>
-          <div>
-            Status: <b>{data.trip.status}</b>
-          </div>
-          {data.trip.vehicle_info && <div>Bil: {data.trip.vehicle_info}</div>}
-
-          <hr style={{ margin: "14px 0" }} />
-
-          {data.reserved_driver ? (
-            <div style={{ padding: 10, border: "1px solid #eee", borderRadius: 10, marginBottom: 12 }}>
-              <div style={{ fontWeight: 700 }}>Paxad av:</div>
-              <div>{data.reserved_driver.name}</div>
-              <div style={{ fontSize: 13, opacity: 0.8 }}>{data.reserved_driver.email}</div>
-            </div>
-          ) : (
-            <p style={{ opacity: 0.8 }}>Ingen driver synlig (antingen OPEN eller inte ditt företag).</p>
-          )}
-
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <button onClick={onComplete}>Markera Completed</button>
-            <button onClick={onCancel}>Avboka (Cancel)</button>
-            <button onClick={onUnreserve}>Avboka min paxning</button>
-          </div>
-
-          <p style={{ marginTop: 10, fontSize: 13, opacity: 0.75 }}>
-            Obs: Om du inte har rättighet för en knapp får du 403. Nästa steg kan vi gömma knappar baserat på roll.
-          </p>
+      {err && (
+        <div style={{ marginBottom: 12 }}>
+          <Alert tone="danger">Error: {err}</Alert>
         </div>
       )}
-    </div>
+
+      {data && (
+        <Card>
+          <Row gap={12} align="flex-start">
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 18 }}>
+                {data.trip.origin} → {data.trip.destination}
+              </div>
+              <Muted>
+                Datum: {data.trip.date ?? "-"} • Tid: {data.trip.time_window ?? "-"}
+              </Muted>
+              <div style={{ marginTop: 8 }}>Ersättning: <b>{data.trip.compensation_sek} SEK</b></div>
+              {data.trip.vehicle_info && <div>Bil: {data.trip.vehicle_info}</div>}
+            </div>
+
+            <Spacer />
+
+            <Badge tone={statusTone(data.trip.status)}>{data.trip.status}</Badge>
+          </Row>
+
+          <Divider />
+
+          {data.reserved_driver ? (
+            <Card style={{ padding: 12, borderRadius: 12, boxShadow: "none" }}>
+              <div style={{ fontWeight: 800, marginBottom: 6 }}>Paxad av</div>
+              <div>{data.reserved_driver.name}</div>
+              <Muted>{data.reserved_driver.email}</Muted>
+            </Card>
+          ) : (
+            <Muted>
+              Ingen driver synlig (antingen OPEN eller så är du inte företaget som äger trippen).
+            </Muted>
+          )}
+
+          <Divider />
+
+          <Row gap={10}>
+            {/* DRIVER actions */}
+            {me?.role === "DRIVER" && data.trip.status === "OPEN" && (
+              <Button
+                onClick={() => runAction("reserve", () => apiPost(`/trips/${tripId}/reserve`, {}))}
+                loading={action === "reserve"}
+              >
+                Paxa denna trip
+              </Button>
+            )}
+
+            {me?.role === "DRIVER" && data.trip.status === "RESERVED" && (
+              <Button
+                variant="secondary"
+                onClick={() => runAction("unreserve", () => apiDelete(`/trips/${tripId}/reserve`))}
+                loading={action === "unreserve"}
+              >
+                Avboka min paxning
+              </Button>
+            )}
+
+            {/* COMPANY actions */}
+            {me?.role === "COMPANY" && data.trip.status === "RESERVED" && (
+              <Button
+                onClick={() => runAction("complete", () => apiPost(`/trips/${tripId}/complete`, {}))}
+                loading={action === "complete"}
+              >
+                Markera Completed
+              </Button>
+            )}
+
+            {me?.role === "COMPANY" && (data.trip.status === "OPEN" || data.trip.status === "RESERVED") && (
+              <Button
+                variant="danger"
+                onClick={() => runAction("cancel", () => apiPost(`/trips/${tripId}/cancel`, {}))}
+                loading={action === "cancel"}
+              >
+                Avboka (Cancel)
+              </Button>
+            )}
+          </Row>
+
+          <div style={{ marginTop: 10 }}>
+            <Muted>Knapparna visas bara när de är relevanta (roll + status).</Muted>
+          </div>
+        </Card>
+      )}
+    </Container>
   );
 }

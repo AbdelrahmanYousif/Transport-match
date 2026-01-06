@@ -1,7 +1,16 @@
-import { useEffect, useState } from "react";
-import { apiGet, apiPostJson, type Trip } from "../api";
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { apiPostJson } from "../api";
+import { Alert, Button, Card, Container, H1, Muted, Row, Spacer } from "../ui";
+
+function isLikelyISODate(s: string) {
+  // enkel check: YYYY-MM-DD
+  return /^\d{4}-\d{2}-\d{2}$/.test(s);
+}
 
 export default function CreateTrip() {
+  const nav = useNavigate();
+
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -9,37 +18,42 @@ export default function CreateTrip() {
   const [destination, setDestination] = useState("Uppsala");
   const [date, setDate] = useState("2025-12-23");
   const [timeWindow, setTimeWindow] = useState("08-12");
-  const [compensationSek, setCompensationSek] = useState(500);
+  const [compensationSek, setCompensationSek] = useState<number>(500);
   const [vehicleInfo, setVehicleInfo] = useState("Volvo V60");
 
-  const [openTrips, setOpenTrips] = useState<Trip[]>([]);
-
-  async function loadOpenTrips() {
-    try {
-      const data = await apiGet<Trip[]>("/trips");
-      setOpenTrips(data);
-    } catch (e) {
-      setErr(String(e));
-    }
-  }
+  const validationError = useMemo(() => {
+    if (!origin.trim()) return "Origin kan inte vara tom.";
+    if (!destination.trim()) return "Destination kan inte vara tom.";
+    if (!date.trim()) return "Datum krävs.";
+    if (!isLikelyISODate(date.trim())) return "Datum måste vara i format YYYY-MM-DD.";
+    if (Number.isNaN(Number(compensationSek))) return "Compensation måste vara ett nummer.";
+    if (Number(compensationSek) < 0) return "Compensation kan inte vara negativ.";
+    return null;
+  }, [origin, destination, date, compensationSek]);
 
   async function createTrip() {
+    if (validationError) {
+      setErr(validationError);
+      return;
+    }
+
     try {
       setBusy(true);
       setErr(null);
 
       const payload = {
-        origin,
-        destination,
-        date,
-        time_window: timeWindow,
+        origin: origin.trim(),
+        destination: destination.trim(),
+        date: date.trim(),
+        time_window: timeWindow.trim() || null,
         compensation_sek: Number(compensationSek),
-        vehicle_info: vehicleInfo,
+        vehicle_info: vehicleInfo.trim() || null,
       };
 
-      await apiPostJson<Trip>("/trips", payload);
-      await loadOpenTrips();
-      alert("Trip skapad ✅");
+      await apiPostJson("/trips", payload);
+
+      // “riktigt” flöde: efter skapad trip -> mina körningar
+      nav("/mine");
     } catch (e) {
       setErr(String(e));
     } finally {
@@ -47,90 +61,124 @@ export default function CreateTrip() {
     }
   }
 
-  useEffect(() => {
-    loadOpenTrips();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   return (
-    <div>
-      <h1 style={{ marginTop: 0 }}>Create Trip</h1>
-      <p>Här skapar företag en körning som förare kan paxa.</p>
+    <Container maxWidth={880}>
+      <Row style={{ marginBottom: 12 }}>
+        <H1>Create Trip</H1>
+        <Spacer />
+        <Button variant="secondary" onClick={() => nav("/mine")}>
+          Till Mina körningar
+        </Button>
+      </Row>
 
-      <div style={{ maxWidth: 520 }}>
-        <label>
-          Origin
-          <input value={origin} onChange={(e) => setOrigin(e.target.value)} style={{ width: "100%" }} />
-        </label>
+      <Muted>
+        Här skapar företag en körning som drivers kan paxa. Fyll i detaljer och skapa.
+      </Muted>
 
-        <label>
-          Destination
-          <input value={destination} onChange={(e) => setDestination(e.target.value)} style={{ width: "100%" }} />
-        </label>
+      {err && (
+        <div style={{ marginTop: 12 }}>
+          <Alert tone="danger">Error: {err}</Alert>
+        </div>
+      )}
 
-        <label>
-          Date (YYYY-MM-DD)
-          <input value={date} onChange={(e) => setDate(e.target.value)} style={{ width: "100%" }} />
-        </label>
+      <div style={{ marginTop: 14, maxWidth: 560 }}>
+        <Card>
+          <div style={{ display: "grid", gap: 10 }}>
+            <label>
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>Origin</div>
+              <input
+                value={origin}
+                onChange={(e) => setOrigin(e.target.value)}
+                style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #ddd" }}
+              />
+            </label>
 
-        <label>
-          Time window
-          <input value={timeWindow} onChange={(e) => setTimeWindow(e.target.value)} style={{ width: "100%" }} />
-        </label>
+            <label>
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>Destination</div>
+              <input
+                value={destination}
+                onChange={(e) => setDestination(e.target.value)}
+                style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #ddd" }}
+              />
+            </label>
 
-        <label>
-          Compensation (SEK)
-          <input
-            type="number"
-            value={compensationSek}
-            onChange={(e) => setCompensationSek(Number(e.target.value))}
-            style={{ width: "100%" }}
-          />
-        </label>
+            <label>
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>Date (YYYY-MM-DD)</div>
+              <input
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                placeholder="2025-12-23"
+                style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #ddd" }}
+              />
+            </label>
 
-        <label>
-          Vehicle info
-          <input value={vehicleInfo} onChange={(e) => setVehicleInfo(e.target.value)} style={{ width: "100%" }} />
-        </label>
-
-        <button onClick={createTrip} disabled={busy} style={{ marginTop: 12 }}>
-          {busy ? "Skapar..." : "Skapa trip"}
-        </button>
-
-        {err && <p style={{ color: "crimson", marginTop: 12 }}>Error: {err}</p>}
-      </div>
-
-      <hr style={{ margin: "24px 0" }} />
-
-      <h3>OPEN trips (för test)</h3>
-      <button onClick={loadOpenTrips}>Uppdatera</button>
-
-      <div style={{ marginTop: 12 }}>
-        {openTrips.length === 0 ? (
-          <p>Inga OPEN trips just nu.</p>
-        ) : (
-          openTrips.map((t) => (
-            <div
-              key={t.id}
-              style={{
-                border: "1px solid #ddd",
-                borderRadius: 10,
-                padding: 12,
-                marginBottom: 10,
-              }}
-            >
-              <div style={{ fontWeight: 700 }}>
-                #{t.id} {t.origin} → {t.destination}
+            <label>
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>Time window</div>
+              <input
+                value={timeWindow}
+                onChange={(e) => setTimeWindow(e.target.value)}
+                placeholder="08-12"
+                style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #ddd" }}
+              />
+              <div style={{ fontSize: 12, opacity: 0.75, marginTop: 6 }}>
+                Exempel: 08-12 eller 14-18 (valfritt).
               </div>
-              <div>
-                Datum: {t.date ?? "-"} | Tid: {t.time_window ?? "-"}
+            </label>
+
+            <label>
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>Compensation (SEK)</div>
+              <input
+                type="number"
+                value={compensationSek}
+                onChange={(e) => setCompensationSek(Number(e.target.value))}
+                style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #ddd" }}
+              />
+            </label>
+
+            <label>
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>Vehicle info</div>
+              <input
+                value={vehicleInfo}
+                onChange={(e) => setVehicleInfo(e.target.value)}
+                placeholder="Volvo V60"
+                style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #ddd" }}
+              />
+            </label>
+
+            {validationError && (
+              <div style={{ marginTop: 6 }}>
+                <Alert tone="warning">{validationError}</Alert>
               </div>
-              <div>Ersättning: {t.compensation_sek} SEK</div>
-              <div>Status: {t.status}</div>
-            </div>
-          ))
-        )}
+            )}
+
+            <Row style={{ marginTop: 6 }}>
+              <Button
+                onClick={createTrip}
+                loading={busy}
+                disabled={!!validationError}
+              >
+                Skapa trip
+              </Button>
+
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setOrigin("Stockholm");
+                  setDestination("Uppsala");
+                  setDate("2025-12-23");
+                  setTimeWindow("08-12");
+                  setCompensationSek(500);
+                  setVehicleInfo("Volvo V60");
+                  setErr(null);
+                }}
+                disabled={busy}
+              >
+                Reset
+              </Button>
+            </Row>
+          </div>
+        </Card>
       </div>
-    </div>
+    </Container>
   );
 }
