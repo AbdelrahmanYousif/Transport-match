@@ -1,219 +1,287 @@
-// frontend/src/ui.tsx
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, ReactNode, ButtonHTMLAttributes, HTMLAttributes } from "react";
+
+type Tone = "neutral" | "success" | "warning" | "danger";
 
 type BaseProps = {
   children?: ReactNode;
-  className?: string;
   style?: CSSProperties;
-};
+} & Omit<HTMLAttributes<HTMLDivElement>, "style">;
 
+// ---------- Small helpers ----------
 const styles = {
-  container: {
-    maxWidth: 980,
-    margin: "0 auto",
+  page: {
     padding: 16,
   } as CSSProperties,
 
+  container: (maxWidth?: number) =>
+    ({
+      margin: "0 auto",
+      padding: 16,
+      maxWidth: maxWidth ?? 960,
+    }) as CSSProperties,
+
   card: {
-    border: "1px solid #e6e6e6",
+    border: "1px solid #e5e7eb",
     borderRadius: 14,
     padding: 14,
     background: "#fff",
+    boxShadow: "0 8px 30px rgba(0,0,0,0.04)",
   } as CSSProperties,
 
-  muted: {
-    color: "rgba(0,0,0,0.65)",
-    fontSize: 14,
-    lineHeight: 1.35,
+  divider: {
+    border: "none",
+    borderTop: "1px solid #e5e7eb",
+    margin: "14px 0",
   } as CSSProperties,
 
   h1: {
-    margin: "0 0 8px 0",
+    margin: 0,
     fontSize: 28,
     letterSpacing: -0.2,
   } as CSSProperties,
 
-  h2: {
-    margin: "0 0 8px 0",
-    fontSize: 20,
-    letterSpacing: -0.1,
-  } as CSSProperties,
-
-  row: {
-    display: "flex",
-    gap: 12,
-    alignItems: "center",
-  } as CSSProperties,
-
-  badge: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 8,
-    fontSize: 12,
-    padding: "4px 10px",
-    borderRadius: 999,
-    border: "1px solid #e6e6e6",
-    background: "#fafafa",
-  } as CSSProperties,
-
-  input: {
-    width: "100%",
-    padding: "10px 12px",
-    borderRadius: 10,
-    border: "1px solid #dadada",
-    outline: "none",
+  muted: {
+    color: "#6b7280",
     fontSize: 14,
+    lineHeight: 1.4,
   } as CSSProperties,
 
-  button: {
+  row: (gap?: number, align?: CSSProperties["alignItems"], wrap?: boolean) =>
+    ({
+      display: "flex",
+      alignItems: align ?? "center",
+      gap: gap ?? 10,
+      flexWrap: wrap ? "wrap" : "nowrap",
+    }) as CSSProperties,
+
+  spacer: {
+    flex: 1,
+    minWidth: 8,
+  } as CSSProperties,
+
+  // Buttons
+  buttonBase: {
     padding: "10px 14px",
-    borderRadius: 10,
-    border: "1px solid #111",
-    background: "#111",
-    color: "#fff",
+    borderRadius: 12,
+    border: "1px solid transparent",
     cursor: "pointer",
     fontSize: 14,
+    fontWeight: 650,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    userSelect: "none",
+  } as CSSProperties,
+
+  buttonPrimary: {
+    background: "#111827",
+    color: "#fff",
+    borderColor: "#111827",
   } as CSSProperties,
 
   buttonSecondary: {
-    padding: "10px 14px",
-    borderRadius: 10,
-    border: "1px solid #dadada",
     background: "#fff",
-    color: "#111",
-    cursor: "pointer",
+    color: "#111827",
+    borderColor: "#d1d5db",
+  } as CSSProperties,
+
+  buttonGhost: {
+    background: "transparent",
+    color: "#111827",
+    borderColor: "transparent",
+  } as CSSProperties,
+
+  buttonDanger: {
+    background: "#9f1239",
+    color: "#fff",
+    borderColor: "#9f1239",
+  } as CSSProperties,
+
+  buttonDisabled: {
+    opacity: 0.6,
+    cursor: "not-allowed",
+  } as CSSProperties,
+
+  // Alert
+  alertBase: {
+    borderRadius: 14,
+    padding: 12,
+    border: "1px solid #e5e7eb",
+    background: "#f9fafb",
+    color: "#111827",
     fontSize: 14,
   } as CSSProperties,
 
-  divider: {
-    height: 1,
-    background: "#eee",
-    border: "none",
-    margin: "16px 0",
+  // Badge
+  badgeBase: {
+    borderRadius: 999,
+    padding: "6px 10px",
+    border: "1px solid #e5e7eb",
+    fontSize: 12,
+    fontWeight: 700,
+    whiteSpace: "nowrap",
   } as CSSProperties,
 };
 
-function cx(a?: string, b?: string) {
-  return [a, b].filter(Boolean).join(" ");
+// Tone palettes (Alert + Badge)
+function toneColors(tone: Tone) {
+  switch (tone) {
+    case "success":
+      return { bg: "#ecfdf5", border: "#10b98133", text: "#065f46" };
+    case "warning":
+      return { bg: "#fffbeb", border: "#f59e0b33", text: "#92400e" };
+    case "danger":
+      return { bg: "#fef2f2", border: "#ef444433", text: "#991b1b" };
+    default:
+      return { bg: "#f9fafb", border: "#e5e7eb", text: "#111827" };
+  }
 }
 
-export function Container({ children, className, style }: BaseProps) {
+// ---------- Components ----------
+export function Container({
+  children,
+  style,
+  maxWidth,
+  ...rest
+}: BaseProps & { maxWidth?: number }) {
   return (
-    <div className={className} style={{ ...styles.container, ...style }}>
+    <div style={{ ...styles.container(maxWidth), ...style }} {...rest}>
       {children}
     </div>
   );
 }
 
-export function Card({ children, className, style }: BaseProps) {
+export function Card({ children, style, ...rest }: BaseProps) {
   return (
-    <div className={className} style={{ ...styles.card, ...style }}>
+    <div style={{ ...styles.card, ...style }} {...rest}>
       {children}
     </div>
   );
 }
 
-export function Muted({ children, className, style }: BaseProps) {
-  return (
-    <div className={className} style={{ ...styles.muted, ...style }}>
-      {children}
-    </div>
-  );
+export function Divider({ style, ...rest }: { style?: CSSProperties } & React.ComponentProps<"hr">) {
+  return <hr style={{ ...styles.divider, ...style }} {...rest} />;
 }
 
-export function H1({ children, className, style }: BaseProps) {
+export function H1({ children, style, ...rest }: BaseProps) {
   return (
-    <h1 className={className} style={{ ...styles.h1, ...style }}>
+    <h1 style={{ ...styles.h1, ...style }} {...rest}>
       {children}
     </h1>
   );
 }
 
-export function H2({ children, className, style }: BaseProps) {
+export function Muted({ children, style, ...rest }: BaseProps) {
   return (
-    <h2 className={className} style={{ ...styles.h2, ...style }}>
+    <div style={{ ...styles.muted, ...style }} {...rest}>
       {children}
-    </h2>
+    </div>
   );
 }
 
 export function Row({
   children,
-  className,
   style,
-  wrap = false,
-}: BaseProps & { wrap?: boolean }) {
+  gap,
+  align,
+  wrap = true,
+  ...rest
+}: BaseProps & { gap?: number; align?: CSSProperties["alignItems"]; wrap?: boolean }) {
+  return (
+    <div style={{ ...styles.row(gap, align, wrap), ...style }} {...rest}>
+      {children}
+    </div>
+  );
+}
+
+export function Spacer() {
+  return <div style={styles.spacer} />;
+}
+
+export function Alert({
+  children,
+  style,
+  tone = "neutral",
+  ...rest
+}: BaseProps & { tone?: Tone }) {
+  const c = toneColors(tone);
   return (
     <div
-      className={className}
       style={{
-        ...styles.row,
-        ...(wrap ? { flexWrap: "wrap" as const } : null),
+        ...styles.alertBase,
+        background: c.bg,
+        borderColor: c.border,
+        color: c.text,
         ...style,
       }}
+      {...rest}
     >
       {children}
     </div>
   );
 }
 
-export function Divider({ className, style }: { className?: string; style?: CSSProperties }) {
-  return <hr className={className} style={{ ...styles.divider, ...style }} />;
-}
-
 export function Badge({
   children,
-  className,
   style,
   tone = "neutral",
-}: BaseProps & { tone?: "neutral" | "success" | "warn" | "danger" }) {
-  const toneStyle: Record<string, CSSProperties> = {
-    neutral: { background: "#fafafa", borderColor: "#e6e6e6", color: "#111" },
-    success: { background: "#f2fbf4", borderColor: "#bfe9c8", color: "#0b6b2a" },
-    warn: { background: "#fff7ed", borderColor: "#fed7aa", color: "#9a3412" },
-    danger: { background: "#fff1f2", borderColor: "#fecdd3", color: "#9f1239" },
-  };
-
+  ...rest
+}: BaseProps & { tone?: Tone }) {
+  const c = toneColors(tone);
   return (
-    <span className={className} style={{ ...styles.badge, ...toneStyle[tone], ...style }}>
+    <span
+      style={{
+        ...styles.badgeBase,
+        background: c.bg,
+        borderColor: c.border,
+        color: c.text,
+        ...style,
+      }}
+      {...rest}
+    >
       {children}
     </span>
   );
 }
 
-export function Input(
-  props: React.InputHTMLAttributes<HTMLInputElement> & { style?: CSSProperties }
-) {
-  const { style, ...rest } = props;
-  return <input {...rest} style={{ ...styles.input, ...style }} />;
-}
+type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 
-export function Button(
-  props: React.ButtonHTMLAttributes<HTMLButtonElement> & {
-    variant?: "primary" | "secondary";
-    style?: CSSProperties;
-  }
-) {
-  const { variant = "primary", style, ...rest } = props;
-  const base = variant === "primary" ? styles.button : styles.buttonSecondary;
-  return <button {...rest} style={{ ...base, ...style }} />;
-}
-
-export function A({
-  href,
+export function Button({
   children,
-  className,
   style,
-}: { href: string; children: ReactNode; className?: string; style?: CSSProperties }) {
+  variant = "primary",
+  loading,
+  disabled,
+  ...rest
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: ButtonVariant;
+  loading?: boolean;
+  style?: CSSProperties;
+}) {
+  const variantStyle =
+    variant === "primary"
+      ? styles.buttonPrimary
+      : variant === "secondary"
+      ? styles.buttonSecondary
+      : variant === "danger"
+      ? styles.buttonDanger
+      : styles.buttonGhost;
+
+  const isDisabled = disabled || loading;
+
   return (
-    <a
-      href={href}
-      className={className}
-      style={cx(undefined, className) ? style : style}
-      target="_blank"
-      rel="noreferrer"
+    <button
+      {...rest}
+      disabled={isDisabled}
+      style={{
+        ...styles.buttonBase,
+        ...variantStyle,
+        ...(isDisabled ? styles.buttonDisabled : null),
+        ...style,
+      }}
     >
-      {children}
-    </a>
+      {loading ? "Jobbar..." : children}
+    </button>
   );
 }
