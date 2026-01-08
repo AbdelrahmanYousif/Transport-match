@@ -1,36 +1,46 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { apiGet, apiPostJson, type Me, type Trip } from "../api";
-import { Alert, Badge, Button, Card, Container, Divider, H1, Muted, Row, Spacer } from "../ui";
+import { Link, useNavigate } from "react-router-dom";
+import { apiGet, apiPostJson, getToken, type Me, type Trip } from "../api";
+import { Alert, Button, Card, Container, Divider, H1, Muted, Row, Spacer } from "../ui";
 
-function statusTone(status: string) {
-  if (status === "COMPLETED") return "success";
-  if (status === "RESERVED") return "warning";
-  if (status === "CANCELLED") return "danger";
-  return "neutral"; // OPEN
+function includesInsensitive(hay: string, needle: string) {
+  return hay.toLowerCase().includes(needle.toLowerCase());
 }
 
 export default function Explore() {
+  const nav = useNavigate();
+
   const [me, setMe] = useState<Me | null>(null);
   const [items, setItems] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(false);
+  const [busyTripId, setBusyTripId] = useState<number | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  // per-trip loading
-  const [busyTripId, setBusyTripId] = useState<number | null>(null);
+  // "Hertz-style" search
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [date, setDate] = useState(""); // YYYY-MM-DD (valfritt filter)
 
   async function load() {
     try {
       setLoading(true);
       setErr(null);
 
-      const [m, trips] = await Promise.all([
-        apiGet<Me>("/me"),
-        apiGet<Trip[]>("/trips"), // backend returnerar OPEN
-      ]);
-
-      setMe(m);
+      // Trips är publikt (OPEN)
+      const trips = await apiGet<Trip[]>("/trips");
       setItems(trips);
+
+      // Me är bara om man har token
+      if (getToken()) {
+        try {
+          const m = await apiGet<Me>("/me");
+          setMe(m);
+        } catch {
+          setMe(null);
+        }
+      } else {
+        setMe(null);
+      }
     } catch (e) {
       setErr(String(e));
     } finally {
@@ -40,17 +50,40 @@ export default function Explore() {
 
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const canReserve = useMemo(() => me?.role === "DRIVER", [me?.role]);
+  const filtered = useMemo(() => {
+    return items.filter((t) => {
+      const okFrom = !from.trim() || includesInsensitive(t.origin, from.trim());
+      const okTo = !to.trim() || includesInsensitive(t.destination, to.trim());
+      const okDate = !date.trim() || (t.date ?? "") === date.trim();
+      return okFrom && okTo && okDate;
+    });
+  }, [items, from, to, date]);
+
+  const isLoggedIn = !!me;
+  const canReserve = me?.role === "DRIVER";
 
   async function onReserve(tripId: number) {
+    // om inte inloggad: skicka till auth och kom tillbaka till trip-sidan
+    if (!isLoggedIn) {
+      nav(`/auth?role=DRIVER&next=${encodeURIComponent(`/trips/${tripId}`)}`);
+      return;
+    }
+
+    // om fel roll: visa tydligt
+    if (!canReserve) {
+      setErr("Endast DRIVER kan paxa körningar. Logga in med ett driver-konto.");
+      return;
+    }
+
     try {
       setErr(null);
       setBusyTripId(tripId);
-      // din backend bryr sig inte om body här, men vi skickar tom json
       await apiPostJson(`/trips/${tripId}/reserve`, {});
       await load();
+      nav(`/trips/${tripId}`);
     } catch (e) {
       setErr(String(e));
     } finally {
@@ -59,90 +92,168 @@ export default function Explore() {
   }
 
   return (
-    <Container maxWidth={880}>
-      <Row style={{ marginBottom: 12 }}>
-        <H1>Explore</H1>
-        <Spacer />
-        <Button variant="secondary" onClick={load} loading={loading}>
-          Uppdatera
-        </Button>
-      </Row>
+    <Container maxWidth={1100}>
+      {/* HERO + SEARCH (Home + Explore i samma sida) */}
+      <Card>
+        <Row align="flex-start" style={{ gap: 16 }}>
+          <div style={{ minWidth: 0 }}>
+            <H1 style={{ marginTop: 0 }}>Hitta en körning</H1>
+            <Muted>
+              Sök bland tillgängliga körningar. Du kan se allt utan konto — men för att paxa behöver du logga in.
+            </Muted>
+          </div>
+          <Spacer />
+          <Button variant="secondary" onClick={load} loading={loading}>
+            Uppdatera
+          </Button>
+        </Row>
 
-      <div style={{ marginBottom: 10 }}>
-  <Muted>Här visas lediga körningar (OPEN). Drivers kan paxa direkt.</Muted>
-</div>
+        <Divider />
 
-      {err && (
-        <div style={{ marginBottom: 12 }}>
-          <Alert tone="danger">Error: {err}</Alert>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr 220px auto",
+            gap: 10,
+            alignItems: "end",
+          }}
+        >
+          <label>
+            <div style={{ fontWeight: 800, marginBottom: 6 }}>Från</div>
+            <input
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              placeholder="t.ex. Stockholm"
+              style={{ width: "100%", padding: 10, borderRadius: 12, border: "1px solid #ddd" }}
+            />
+          </label>
+
+          <label>
+            <div style={{ fontWeight: 800, marginBottom: 6 }}>Till</div>
+            <input
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              placeholder="t.ex. Uppsala"
+              style={{ width: "100%", padding: 10, borderRadius: 12, border: "1px solid #ddd" }}
+            />
+          </label>
+
+          <label>
+            <div style={{ fontWeight: 800, marginBottom: 6 }}>Datum</div>
+            <input
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              placeholder="YYYY-MM-DD"
+              style={{ width: "100%", padding: 10, borderRadius: 12, border: "1px solid #ddd" }}
+            />
+          </label>
+
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setFrom("");
+              setTo("");
+              setDate("");
+            }}
+            disabled={loading}
+          >
+            Rensa
+          </Button>
         </div>
-      )}
 
-      {!canReserve && (
-        <div style={{ marginBottom: 12 }}>
-          <Alert tone="warning">
-            Du är inloggad som <b>{me?.role ?? "?"}</b>. Endast <b>DRIVER</b> kan paxa körningar.
-            <Divider />
-            <Link to="/auth">Logga in / byt konto</Link>
-          </Alert>
-        </div>
-      )}
+        {!isLoggedIn ? (
+          <div style={{ marginTop: 12 }}>
+            <Alert tone="neutral">
+              Du är inte inloggad. Du kan fortfarande se alla resor.
+              <Divider />
+              <Link to="/auth">Logga in / Registrera</Link>
+            </Alert>
+          </div>
+        ) : (
+          <div style={{ marginTop: 12 }}>
+            <Alert tone="success">
+              Inloggad som <b>{me.name}</b> — <b>{me.role}</b>
+            </Alert>
+          </div>
+        )}
 
-      {items.length === 0 && !loading ? (
-        <Card>
-          <div style={{ fontWeight: 800, marginBottom: 6 }}>Inga lediga körningar just nu</div>
-          <Muted>Kom tillbaka senare eller be ett företag skapa en ny körning.</Muted>
-        </Card>
-      ) : (
-        <div style={{ display: "grid", gap: 12 }}>
-          {items.map((t) => {
-            const isBusy = busyTripId === t.id;
-            return (
-              <Card key={t.id}>
-                <Row gap={12} align="flex-start">
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: 900, fontSize: 16 }}>
-                      <Link to={`/trips/${t.id}`} style={{ textDecoration: "none" }}>
-                        #{t.id}
-                      </Link>{" "}
-                      {t.origin} → {t.destination}
+        {err && (
+          <div style={{ marginTop: 12 }}>
+            <Alert tone="danger">Error: {err}</Alert>
+          </div>
+        )}
+      </Card>
+
+      {/* LIST */}
+      <div style={{ marginTop: 14 }}>
+        <Row style={{ marginBottom: 10 }}>
+          <div>
+            <div style={{ fontWeight: 900, fontSize: 16 }}>Tillgängliga körningar</div>
+            <Muted>
+              Visar <b>OPEN</b>. Klicka på en körning för detaljer.
+            </Muted>
+          </div>
+          <Spacer />
+          <div style={{ fontSize: 13, opacity: 0.75 }}>
+            Visar: <b>{filtered.length}</b> / {items.length}
+          </div>
+        </Row>
+
+        {filtered.length === 0 && !loading ? (
+          <Card>
+            <div style={{ fontWeight: 900, marginBottom: 6 }}>Inga matchningar</div>
+            <Muted>Testa att rensa filtret eller ändra sökningen.</Muted>
+          </Card>
+        ) : (
+          <div style={{ display: "grid", gap: 12 }}>
+            {filtered.map((t) => {
+              const isBusy = busyTripId === t.id;
+
+              return (
+                <Card key={t.id}>
+                  <Row align="flex-start" style={{ gap: 12 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 900, fontSize: 16 }}>
+                        <Link to={`/trips/${t.id}`} style={{ textDecoration: "none" }}>
+                          {t.origin} → {t.destination}
+                        </Link>
+                      </div>
+
+                      <Muted style={{ marginTop: 6 }}>
+                        Datum: {t.date ?? "-"} • Tid: {t.time_window ?? "-"}
+                      </Muted>
+
+                      <div style={{ marginTop: 8 }}>
+                        Ersättning: <b>{t.compensation_sek} SEK</b>
+                      </div>
+
+                      {t.vehicle_info && <div style={{ marginTop: 4 }}>Bil: {t.vehicle_info}</div>}
                     </div>
 
-                    <Muted>
-                      Datum: {t.date ?? "-"} • Tid: {t.time_window ?? "-"}
-                    </Muted>
+                    <Spacer />
 
-                    <div style={{ marginTop: 8 }}>
-                      Ersättning: <b>{t.compensation_sek} SEK</b>
-                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+                      <div style={{ fontSize: 12, opacity: 0.7 }}>#{t.id} • {t.status}</div>
 
-                    {t.vehicle_info && <div>Bil: {t.vehicle_info}</div>}
-                  </div>
-
-                  <Spacer />
-
-                  <Row gap={10} wrap={false} align="center">
-                    <Badge tone={statusTone(t.status)}>{t.status}</Badge>
-
-                    {/* Endast DRIVER kan paxa och bara om OPEN */}
-                    {canReserve && t.status === "OPEN" && (
-                      <Button onClick={() => onReserve(t.id)} loading={isBusy} disabled={busyTripId !== null && !isBusy}>
+                      <Button
+                        onClick={() => onReserve(t.id)}
+                        loading={isBusy}
+                        disabled={busyTripId !== null && !isBusy}
+                      >
                         Paxa
                       </Button>
-                    )}
-                  </Row>
-                </Row>
 
-                <div style={{ marginTop: 10 }}>
-                  <Muted>
-                    Klicka på #{t.id} för detaljer.
-                  </Muted>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      )}
+                      <Link to={`/trips/${t.id}`} style={{ fontSize: 13 }}>
+                        Visa detaljer →
+                      </Link>
+                    </div>
+                  </Row>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </Container>
   );
 }

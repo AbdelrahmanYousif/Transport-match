@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { apiGet, type Trip } from "../api";
+import { Link, useNavigate } from "react-router-dom";
+import { apiGet, setToken, type Trip } from "../api";
 import { Alert, Badge, Button, Card, Container, Divider, H1, Muted, Row, Spacer } from "../ui";
 
 function statusTone(status: string) {
@@ -11,6 +11,8 @@ function statusTone(status: string) {
 }
 
 export default function MyTrips() {
+  const nav = useNavigate();
+
   const [items, setItems] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -22,7 +24,13 @@ export default function MyTrips() {
       const data = await apiGet<Trip[]>("/trips/mine");
       setItems(data);
     } catch (e) {
-      setErr(String(e));
+      const msg = String(e);
+      setErr(msg);
+
+      // Om token är expired/ogiltig: skicka till auth på ett snällt sätt
+      if (msg.includes("401")) {
+        setToken(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -31,6 +39,8 @@ export default function MyTrips() {
   useEffect(() => {
     load();
   }, []);
+
+  const isAuthError = !!err && err.includes("401");
 
   return (
     <Container maxWidth={880}>
@@ -48,17 +58,27 @@ export default function MyTrips() {
         </div>
       )}
 
-      {items.length === 0 && !loading ? (
+      {isAuthError && (
+        <Card>
+          <div style={{ fontWeight: 900, marginBottom: 6 }}>Du behöver logga in igen</div>
+          <Muted>Din session kan ha gått ut. Logga in och försök igen.</Muted>
+          <Divider />
+          <Button onClick={() => nav("/auth")}>Logga in</Button>
+        </Card>
+      )}
+
+      {!isAuthError && items.length === 0 && !loading ? (
         <Card>
           <div style={{ fontWeight: 800, marginBottom: 6 }}>Inga körningar ännu</div>
           <Muted>
-            Som företag: skapa en körning på “Create Trip”. Som driver: gå till Explore och paxa en körning.
+            Som företag: skapa en körning på “Create Trip”. Som driver: hitta en körning på startsidan och paxa.
           </Muted>
           <Divider />
           <Row>
-            <Link to="/explore">Gå till Explore</Link>
+            {/* /explore är på väg bort → vi pekar till / */}
+            <Link to="/">Hitta körningar</Link>
             <span style={{ opacity: 0.6 }}>•</span>
-            <Link to="/create">Gå till Create Trip</Link>
+            <Link to="/create">Skapa körning</Link>
           </Row>
         </Card>
       ) : (

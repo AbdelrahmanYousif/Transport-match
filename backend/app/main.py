@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,13 +18,17 @@ app = FastAPI(title="Transport Match API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # lås senare till din frontend domän
+    allow_origins=["*"],  # lås senare
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Krävs för endpoints som måste ha login
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+
+# OPTIONAL token (för att kunna läsa /trips/{id} utan login)
+oauth2_optional = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
 
 
 @app.on_event("startup")
@@ -78,6 +82,16 @@ def get_current_user(token: str = Depends(oauth2_scheme), session: Session = Dep
         raise HTTPException(status_code=401, detail="Användare hittades inte")
 
     return user
+
+
+def get_optional_user(token: Optional[str] = Depends(oauth2_optional), session: Session = Depends(get_session)) -> Optional[User]:
+    if not token:
+        return None
+    try:
+        user_id = int(decode_token(token))
+    except Exception:
+        return None
+    return session.get(User, user_id)
 
 
 @app.get("/me", response_model=UserPublic)
@@ -143,7 +157,7 @@ def reserve_trip(
     except IntegrityError:
         session.rollback()
         raise HTTPException(status_code=400, detail="Trip är redan paxad")
-    
+
 
 @app.get("/trips/mine", response_model=List[TripPublic])
 def my_trips(
@@ -165,10 +179,11 @@ def my_trips(
     return [TripPublic(**t.model_dump()) for t in trips]
 
 
+# ✅ NU: Trip detail kan öppnas utan login
 @app.get("/trips/{trip_id}", response_model=TripDetailPublic)
 def get_trip(
     trip_id: int,
-    user: User = Depends(get_current_user),
+    user: Optional[User] = Depends(get_optional_user),
     session: Session = Depends(get_session),
 ):
     trip = session.get(Trip, trip_id)
@@ -180,7 +195,7 @@ def get_trip(
         res = session.exec(select(Reservation).where(Reservation.trip_id == trip_id)).first()
 
         # Bara företaget som äger trippen får se vem som paxat
-        if res and user.role == UserRole.COMPANY and trip.company_id == user.id:
+        if res and user and user.role == UserRole.COMPANY and trip.company_id == user.id:
             driver = session.get(User, res.driver_id)
             if driver:
                 reserved_driver = UserPublic(**driver.model_dump())
@@ -189,89 +204,3 @@ def get_trip(
         trip=TripPublic(**trip.model_dump()),
         reserved_driver=reserved_driver,
     )
-
-
-@app.delete("/trips/{trip_id}/reserve")
-def unreserve_trip(
-    trip_id: int,
-    user: User = Depends(get_current_user),
-    session: Session = Depends(get_session),
-):
-    if user.role != UserRole.DRIVER:
-        raise HTTPException(status_code=403, detail="Endast drivers kan avboka")
-
-    trip = session.get(Trip, trip_id)
-    if not trip:
-        raise HTTPException(status_code=404, detail="Trip finns inte")
-
-    if trip.status != TripStatus.RESERVED:
-        raise HTTPException(status_code=400, detail="Trip är inte paxad")
-
-    res = session.exec(select(Reservation).where(Reservation.trip_id == trip_id)).first()
-    if not res:
-        raise HTTPException(status_code=404, detail="Reservation saknas")
-
-    if res.driver_id != user.id:
-        raise HTTPException(status_code=403, detail="Du har inte paxat denna trip")
-
-    session.delete(res)
-    trip.status = TripStatus.OPEN
-    session.add(trip)
-    session.commit()
-
-    return {"ok": True, "trip_id": trip_id}
-
-
-@app.post("/trips/{trip_id}/complete")
-def complete_trip(
-    trip_id: int,
-    user: User = Depends(get_current_user),
-    session: Session = Depends(get_session),
-):
-    if user.role != UserRole.COMPANY:
-        raise HTTPException(status_code=403, detail="Endast företag kan markera completed")
-
-    trip = session.get(Trip, trip_id)
-    if not trip:
-        raise HTTPException(status_code=404, detail="Trip finns inte")
-
-    if trip.company_id != user.id:
-        raise HTTPException(status_code=403, detail="Inte din trip")
-
-    if trip.status != TripStatus.RESERVED:
-        raise HTTPException(status_code=400, detail="Trip måste vara RESERVED för att slutföras")
-
-    trip.status = TripStatus.COMPLETED
-    session.add(trip)
-    session.commit()
-    return {"ok": True, "trip_id": trip_id, "status": trip.status}
-
-
-@app.post("/trips/{trip_id}/cancel")
-def cancel_trip(
-    trip_id: int,
-    user: User = Depends(get_current_user),
-    session: Session = Depends(get_session),
-):
-    if user.role != UserRole.COMPANY:
-        raise HTTPException(status_code=403, detail="Endast företag kan avboka")
-
-    trip = session.get(Trip, trip_id)
-    if not trip:
-        raise HTTPException(status_code=404, detail="Trip finns inte")
-
-    if trip.company_id != user.id:
-        raise HTTPException(status_code=403, detail="Inte din trip")
-
-    if trip.status not in (TripStatus.OPEN, TripStatus.RESERVED):
-        raise HTTPException(status_code=400, detail="Trip kan inte avbokas i nuvarande status")
-
-    # om den var paxad: ta bort reservationen
-    res = session.exec(select(Reservation).where(Reservation.trip_id == trip_id)).first()
-    if res:
-        session.delete(res)
-
-    trip.status = TripStatus.CANCELLED
-    session.add(trip)
-    session.commit()
-    return {"ok": True, "trip_id": trip_id, "status": trip.status}

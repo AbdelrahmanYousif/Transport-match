@@ -1,180 +1,62 @@
-import type { CSSProperties, ReactNode, ButtonHTMLAttributes, HTMLAttributes } from "react";
+import React from "react";
 
 type Tone = "neutral" | "success" | "warning" | "danger";
 
 type BaseProps = {
-  children?: ReactNode;
-  style?: CSSProperties;
-} & Omit<HTMLAttributes<HTMLDivElement>, "style">;
-
-// ---------- Small helpers ----------
-const styles = {
-  page: {
-    padding: 16,
-  } as CSSProperties,
-
-  container: (maxWidth?: number) =>
-    ({
-      margin: "0 auto",
-      padding: 16,
-      maxWidth: maxWidth ?? 960,
-    }) as CSSProperties,
-
-  card: {
-    border: "1px solid #e5e7eb",
-    borderRadius: 14,
-    padding: 14,
-    background: "#fff",
-    boxShadow: "0 8px 30px rgba(0,0,0,0.04)",
-  } as CSSProperties,
-
-  divider: {
-    border: "none",
-    borderTop: "1px solid #e5e7eb",
-    margin: "14px 0",
-  } as CSSProperties,
-
-  h1: {
-    margin: 0,
-    fontSize: 28,
-    letterSpacing: -0.2,
-  } as CSSProperties,
-
-  muted: {
-    color: "#6b7280",
-    fontSize: 14,
-    lineHeight: 1.4,
-  } as CSSProperties,
-
-  row: (gap?: number, align?: CSSProperties["alignItems"], wrap?: boolean) =>
-    ({
-      display: "flex",
-      alignItems: align ?? "center",
-      gap: gap ?? 10,
-      flexWrap: wrap ? "wrap" : "nowrap",
-    }) as CSSProperties,
-
-  spacer: {
-    flex: 1,
-    minWidth: 8,
-  } as CSSProperties,
-
-  // Buttons
-  buttonBase: {
-    padding: "10px 14px",
-    borderRadius: 12,
-    border: "1px solid transparent",
-    cursor: "pointer",
-    fontSize: 14,
-    fontWeight: 650,
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    userSelect: "none",
-  } as CSSProperties,
-
-  buttonPrimary: {
-    background: "#111827",
-    color: "#fff",
-    borderColor: "#111827",
-  } as CSSProperties,
-
-  buttonSecondary: {
-    background: "#fff",
-    color: "#111827",
-    borderColor: "#d1d5db",
-  } as CSSProperties,
-
-  buttonGhost: {
-    background: "transparent",
-    color: "#111827",
-    borderColor: "transparent",
-  } as CSSProperties,
-
-  buttonDanger: {
-    background: "#9f1239",
-    color: "#fff",
-    borderColor: "#9f1239",
-  } as CSSProperties,
-
-  buttonDisabled: {
-    opacity: 0.6,
-    cursor: "not-allowed",
-  } as CSSProperties,
-
-  // Alert
-  alertBase: {
-    borderRadius: 14,
-    padding: 12,
-    border: "1px solid #e5e7eb",
-    background: "#f9fafb",
-    color: "#111827",
-    fontSize: 14,
-  } as CSSProperties,
-
-  // Badge
-  badgeBase: {
-    borderRadius: 999,
-    padding: "6px 10px",
-    border: "1px solid #e5e7eb",
-    fontSize: 12,
-    fontWeight: 700,
-    whiteSpace: "nowrap",
-  } as CSSProperties,
+  children?: React.ReactNode;
+  style?: React.CSSProperties;
+  className?: string;
 };
 
-// Tone palettes (Alert + Badge)
-function toneColors(tone: Tone) {
-  switch (tone) {
-    case "success":
-      return { bg: "#ecfdf5", border: "#10b98133", text: "#065f46" };
-    case "warning":
-      return { bg: "#fffbeb", border: "#f59e0b33", text: "#92400e" };
-    case "danger":
-      return { bg: "#fef2f2", border: "#ef444433", text: "#991b1b" };
-    default:
-      return { bg: "#f9fafb", border: "#e5e7eb", text: "#111827" };
-  }
+const COLORS = {
+  text: "#0f172a",
+  muted: "rgba(15,23,42,0.72)",
+  border: "rgba(15,23,42,0.10)",
+  bg: "#ffffff",
+  bgSoft: "rgba(15,23,42,0.04)",
+  shadow: "0 14px 28px rgba(15,23,42,0.10)",
+  shadowSoft: "0 10px 22px rgba(15,23,42,0.08)",
+  primary: "#0f172a",
+};
+
+function toneStyles(tone: Tone) {
+  if (tone === "success") return { bg: "rgba(34,197,94,0.12)", fg: "#166534", bd: "rgba(34,197,94,0.25)" };
+  if (tone === "warning") return { bg: "rgba(245,158,11,0.14)", fg: "#92400e", bd: "rgba(245,158,11,0.28)" };
+  if (tone === "danger") return { bg: "rgba(239,68,68,0.12)", fg: "#991b1b", bd: "rgba(239,68,68,0.25)" };
+  return { bg: "rgba(15,23,42,0.06)", fg: COLORS.text, bd: COLORS.border };
 }
 
-// ---------- Components ----------
 export function Container({
   children,
   style,
-  maxWidth,
-  ...rest
+  maxWidth = 1100,
 }: BaseProps & { maxWidth?: number }) {
   return (
-    <div style={{ ...styles.container(maxWidth), ...style }} {...rest}>
+    <div
+      style={{
+        maxWidth,
+        margin: "0 auto",
+        padding: "0 16px",
+        ...style,
+      }}
+    >
       {children}
     </div>
   );
 }
 
-export function Card({ children, style, ...rest }: BaseProps) {
+export function Card({ children, style }: BaseProps) {
   return (
-    <div style={{ ...styles.card, ...style }} {...rest}>
-      {children}
-    </div>
-  );
-}
-
-export function Divider({ style, ...rest }: { style?: CSSProperties } & React.ComponentProps<"hr">) {
-  return <hr style={{ ...styles.divider, ...style }} {...rest} />;
-}
-
-export function H1({ children, style, ...rest }: BaseProps) {
-  return (
-    <h1 style={{ ...styles.h1, ...style }} {...rest}>
-      {children}
-    </h1>
-  );
-}
-
-export function Muted({ children, style, ...rest }: BaseProps) {
-  return (
-    <div style={{ ...styles.muted, ...style }} {...rest}>
+    <div
+      style={{
+        background: COLORS.bg,
+        border: `1px solid ${COLORS.border}`,
+        borderRadius: 18,
+        padding: 16,
+        boxShadow: COLORS.shadowSoft,
+        ...style,
+      }}
+    >
       {children}
     </div>
   );
@@ -183,39 +65,94 @@ export function Muted({ children, style, ...rest }: BaseProps) {
 export function Row({
   children,
   style,
-  gap,
-  align,
+  gap = 10,
+  align = "center",
   wrap = true,
-  ...rest
-}: BaseProps & { gap?: number; align?: CSSProperties["alignItems"]; wrap?: boolean }) {
+}: BaseProps & {
+  gap?: number;
+  align?: React.CSSProperties["alignItems"];
+  wrap?: boolean;
+}) {
   return (
-    <div style={{ ...styles.row(gap, align, wrap), ...style }} {...rest}>
+    <div
+      style={{
+        display: "flex",
+        alignItems: align,
+        gap,
+        flexWrap: wrap ? "wrap" : "nowrap",
+        ...style,
+      }}
+    >
       {children}
     </div>
   );
 }
 
 export function Spacer() {
-  return <div style={styles.spacer} />;
+  return <div style={{ flex: 1 }} />;
+}
+
+export function Divider({ style }: { style?: React.CSSProperties }) {
+  return (
+    <hr
+      style={{
+        border: "none",
+        borderTop: `1px solid ${COLORS.border}`,
+        margin: "14px 0",
+        ...style,
+      }}
+    />
+  );
+}
+
+export function H1({ children, style }: BaseProps) {
+  return (
+    <h1
+      style={{
+        margin: "0 0 8px",
+        fontSize: 34,
+        lineHeight: 1.12,
+        letterSpacing: 0.2,
+        color: COLORS.text,
+        ...style,
+      }}
+    >
+      {children}
+    </h1>
+  );
+}
+
+export function Muted({ children, style }: BaseProps) {
+  return (
+    <div
+      style={{
+        color: COLORS.muted,
+        fontSize: 14,
+        ...style,
+      }}
+    >
+      {children}
+    </div>
+  );
 }
 
 export function Alert({
   children,
-  style,
   tone = "neutral",
-  ...rest
+  style,
 }: BaseProps & { tone?: Tone }) {
-  const c = toneColors(tone);
+  const t = toneStyles(tone);
   return (
     <div
       style={{
-        ...styles.alertBase,
-        background: c.bg,
-        borderColor: c.border,
-        color: c.text,
+        background: t.bg,
+        color: t.fg,
+        border: `1px solid ${t.bd}`,
+        borderRadius: 14,
+        padding: "12px 12px",
+        fontWeight: 700,
         ...style,
       }}
-      {...rest}
     >
       {children}
     </div>
@@ -224,21 +161,25 @@ export function Alert({
 
 export function Badge({
   children,
-  style,
   tone = "neutral",
-  ...rest
+  style,
 }: BaseProps & { tone?: Tone }) {
-  const c = toneColors(tone);
+  const t = toneStyles(tone);
   return (
     <span
       style={{
-        ...styles.badgeBase,
-        background: c.bg,
-        borderColor: c.border,
-        color: c.text,
+        display: "inline-flex",
+        alignItems: "center",
+        padding: "6px 10px",
+        borderRadius: 999,
+        fontSize: 12,
+        fontWeight: 900,
+        background: t.bg,
+        color: t.fg,
+        border: `1px solid ${t.bd}`,
+        whiteSpace: "nowrap",
         ...style,
       }}
-      {...rest}
     >
       {children}
     </span>
@@ -248,37 +189,71 @@ export function Badge({
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 
 export function Button({
-  children,
-  style,
   variant = "primary",
   loading,
   disabled,
-  ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  children,
+  style,
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
   loading?: boolean;
-  style?: CSSProperties;
+  style?: React.CSSProperties;
 }) {
-  const variantStyle =
-    variant === "primary"
-      ? styles.buttonPrimary
-      : variant === "secondary"
-      ? styles.buttonSecondary
-      : variant === "danger"
-      ? styles.buttonDanger
-      : styles.buttonGhost;
-
   const isDisabled = disabled || loading;
+
+  const base: React.CSSProperties = {
+    cursor: isDisabled ? "not-allowed" : "pointer",
+    borderRadius: 14,
+    padding: "10px 14px",
+    fontWeight: 900,
+    border: `1px solid ${COLORS.border}`,
+    boxShadow: COLORS.shadowSoft,
+    transition: "transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease",
+    opacity: isDisabled ? 0.65 : 1,
+  };
+
+  const variants: Record<ButtonVariant, React.CSSProperties> = {
+    primary: {
+      background: COLORS.primary,
+      color: "white",
+      border: "1px solid rgba(15,23,42,0.20)",
+      boxShadow: "0 14px 28px rgba(15,23,42,0.18)",
+    },
+    secondary: {
+      background: "white",
+      color: COLORS.text,
+      border: `1px solid ${COLORS.border}`,
+    },
+    ghost: {
+      background: COLORS.bgSoft,
+      color: COLORS.text,
+      border: `1px solid ${COLORS.border}`,
+      boxShadow: "none",
+    },
+    danger: {
+      background: "#ef4444",
+      color: "white",
+      border: "1px solid rgba(239,68,68,0.25)",
+      boxShadow: "0 14px 28px rgba(239,68,68,0.18)",
+    },
+  };
 
   return (
     <button
-      {...rest}
+      {...props}
       disabled={isDisabled}
       style={{
-        ...styles.buttonBase,
-        ...variantStyle,
-        ...(isDisabled ? styles.buttonDisabled : null),
+        ...base,
+        ...variants[variant],
         ...style,
+      }}
+      onMouseDown={(e) => {
+        if (isDisabled) return;
+        (e.currentTarget as HTMLButtonElement).style.transform = "translateY(1px)";
+      }}
+      onMouseUp={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0px)";
       }}
     >
       {loading ? "Jobbar..." : children}

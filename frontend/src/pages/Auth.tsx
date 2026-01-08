@@ -1,71 +1,62 @@
-import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import {
-  apiGet,
-  apiPostForm,
-  apiPostJson,
-  setToken,
-  type Me,
-  type UserRole,
-} from "../api";
+import { useMemo, useState } from "react";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { apiGet, apiPostForm, apiPostJson, setToken, type Me, type UserRole } from "../api";
+import { Alert, Button, Card, Container, Muted } from "../ui";
 
-type SignupRes = { access_token: string; token_type: string };
+type Mode = "login" | "signup";
 type LoginRes = { access_token: string; token_type: string };
+type SignupRes = { access_token: string; token_type: string };
 
-export default function Auth({ onAuthed }: { onAuthed: (me: Me) => void }) {
+// Hertz-ish: mörk overlay + “väg/bil”-känsla
+const AUTH_BG =
+  "linear-gradient(0deg, rgba(15,23,42,0.60), rgba(15,23,42,0.60)), url('https://images.unsplash.com/photo-1542362567-b07e54358753?auto=format&fit=crop&w=2400&q=60') center/cover";
+
+export default function Auth({ onAuthed }: { onAuthed: (m: Me) => void }) {
   const nav = useNavigate();
   const loc = useLocation();
+  const [sp] = useSearchParams();
 
-  const params = useMemo(() => new URLSearchParams(loc.search), [loc.search]);
-  const roleFromUrl = (params.get("role") as UserRole | null) ?? "DRIVER";
+  const nextFromQuery = sp.get("next"); // ex: /trips/2
+  const fromState = (loc.state as { from?: string } | null)?.from;
+  const next = nextFromQuery || fromState || "/";
 
-  const [mode, setMode] = useState<"signup" | "login">("signup");
+  const presetRole = (sp.get("role") as UserRole | null) ?? "DRIVER";
+
+  const [mode, setMode] = useState<Mode>("login");
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // fields
-  const [name, setName] = useState("Test User");
+  // login
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("123456");
-  const [role, setRole] = useState<UserRole>(roleFromUrl);
 
-  useEffect(() => {
-    setRole(roleFromUrl);
-  }, [roleFromUrl]);
+  // signup extra
+  const [name, setName] = useState("");
+  const [role, setRole] = useState<UserRole>(presetRole);
+
+  const canSubmit = useMemo(() => {
+    if (!email.trim()) return false;
+    if (!password.trim()) return false;
+    if (mode === "signup") {
+      if (!name.trim()) return false;
+      if (!role) return false;
+    }
+    return true;
+  }, [email, password, mode, name, role]);
 
   async function finishAuth(token: string) {
     setToken(token);
     const me = await apiGet<Me>("/me");
     onAuthed(me);
-
-    // Om man kom från en skyddad sida, gå tillbaka dit
-    const from = (loc.state as any)?.from as string | undefined;
-    if (from) nav(from, { replace: true });
-    else nav(me.role === "DRIVER" ? "/explore" : "/create", { replace: true });
-  }
-
-  async function onSignup() {
-    try {
-      setBusy(true);
-      setErr(null);
-
-      const res = await apiPostJson<SignupRes>("/auth/signup", { name, email, password, role });
-      await finishAuth(res.access_token);
-    } catch (e) {
-      setErr(String(e));
-    } finally {
-      setBusy(false);
-    }
+    nav(next, { replace: true });
   }
 
   async function onLogin() {
     try {
       setBusy(true);
       setErr(null);
-
-      // FastAPI OAuth2PasswordRequestForm: username + password
       const res = await apiPostForm<LoginRes>("/auth/login", {
-        username: email,
+        username: email.trim(),
         password: password,
       });
       await finishAuth(res.access_token);
@@ -76,79 +67,226 @@ export default function Auth({ onAuthed }: { onAuthed: (me: Me) => void }) {
     }
   }
 
+  async function onSignup() {
+    try {
+      setBusy(true);
+      setErr(null);
+      const res = await apiPostJson<SignupRes>("/auth/signup", {
+        name: name.trim(),
+        email: email.trim(),
+        password,
+        role,
+      });
+      await finishAuth(res.access_token);
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
-    <div style={{ maxWidth: 520 }}>
-      <h1 style={{ marginTop: 0 }}>Auth</h1>
+    <div
+      style={{
+        minHeight: "calc(100vh - 84px)",
+        background: AUTH_BG,
+        borderRadius: 18,
+        boxShadow: "0 18px 40px rgba(0,0,0,0.12)",
+        overflow: "hidden",
+      }}
+    >
+      <Container maxWidth={1100}>
+        {/* Split layout: vänster hero, höger kort */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1.05fr 0.95fr",
+            gap: 18,
+            alignItems: "center",
+            padding: "26px 16px",
+          }}
+        >
+          {/* LEFT: hero text */}
+          <div style={{ color: "white", padding: 10 }}>
+            <div style={{ fontWeight: 900, fontSize: 44, lineHeight: 1.05, letterSpacing: 0.2 }}>
+              Transport Match
+            </div>
+            <div style={{ marginTop: 10, fontSize: 16, opacity: 0.92, maxWidth: 520 }}>
+              Hitta lediga körningar direkt. Logga in för att paxa (DRIVER) eller skapa körningar (COMPANY).
+            </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-        <button onClick={() => setMode("signup")} disabled={mode === "signup"}>
-          Skapa konto
-        </button>
-        <button onClick={() => setMode("login")} disabled={mode === "login"}>
-          Logga in
-        </button>
-      </div>
+            <div style={{ marginTop: 18, display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <Link
+                to="/"
+                style={{
+                  textDecoration: "none",
+                  color: "white",
+                  fontWeight: 900,
+                  padding: "10px 14px",
+                  borderRadius: 14,
+                  border: "1px solid rgba(255,255,255,0.22)",
+                  background: "rgba(255,255,255,0.08)",
+                }}
+              >
+                ← Till startsidan
+              </Link>
 
-      {mode === "signup" && (
-        <>
-          <label>
-            Namn
-            <input value={name} onChange={(e) => setName(e.target.value)} style={{ width: "100%" }} />
-          </label>
+              <div
+                style={{
+                  fontSize: 13,
+                  opacity: 0.85,
+                  padding: "10px 14px",
+                  borderRadius: 14,
+                  border: "1px solid rgba(255,255,255,0.16)",
+                  background: "rgba(15,23,42,0.25)",
+                }}
+              >
+                Next: <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{next}</span>
+              </div>
+            </div>
+          </div>
 
-          <label>
-            Email
-            <input value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: "100%" }} />
-          </label>
+          {/* RIGHT: auth card */}
+          <Card style={{ width: "100%", maxWidth: 520, padding: 22, justifySelf: "end" }}>
+            <div style={{ textAlign: "center", marginBottom: 10 }}>
+              <div style={{ fontWeight: 900, fontSize: 28, letterSpacing: 0.2 }}>
+                {mode === "login" ? "Sign in" : "Create account"}
+              </div>
+              <Muted>{mode === "login" ? "Sign in with your email address" : "Create an account to continue"}</Muted>
+            </div>
 
-          <label>
-            Lösenord
-            <input
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              type="password"
-              style={{ width: "100%" }}
-            />
-          </label>
+            {err && (
+              <div style={{ marginBottom: 12 }}>
+                <Alert tone="danger">{err}</Alert>
+              </div>
+            )}
 
-          <label>
-            Roll
-            <select value={role} onChange={(e) => setRole(e.target.value as UserRole)} style={{ width: "100%" }}>
-              <option value="DRIVER">DRIVER (paxa)</option>
-              <option value="COMPANY">COMPANY (skapa trips)</option>
-            </select>
-          </label>
+            {/* Tabs */}
+            <div style={{ display: "flex", gap: 10, justifyContent: "center", marginBottom: 14 }}>
+              <button
+                onClick={() => setMode("login")}
+                style={{
+                  cursor: "pointer",
+                  border: "1px solid rgba(15,23,42,0.12)",
+                  background: mode === "login" ? "rgba(15,23,42,0.06)" : "white",
+                  padding: "10px 14px",
+                  borderRadius: 14,
+                  fontWeight: 900,
+                  boxShadow: mode === "login" ? "0 10px 20px rgba(0,0,0,0.06)" : "none",
+                }}
+              >
+                Logga in
+              </button>
+              <button
+                onClick={() => setMode("signup")}
+                style={{
+                  cursor: "pointer",
+                  border: "1px solid rgba(15,23,42,0.12)",
+                  background: mode === "signup" ? "rgba(15,23,42,0.06)" : "white",
+                  padding: "10px 14px",
+                  borderRadius: 14,
+                  fontWeight: 900,
+                  boxShadow: mode === "signup" ? "0 10px 20px rgba(0,0,0,0.06)" : "none",
+                }}
+              >
+                Skapa konto
+              </button>
+            </div>
 
-          <button onClick={onSignup} disabled={busy} style={{ marginTop: 12 }}>
-            {busy ? "Jobbar..." : "Skapa konto"}
-          </button>
-        </>
-      )}
+            <div style={{ display: "grid", gap: 10 }}>
+              {mode === "signup" && (
+                <>
+                  <div>
+                    <div style={{ fontWeight: 800, marginBottom: 6 }}>Roll</div>
+                    <select
+                      value={role}
+                      onChange={(e) => setRole(e.target.value as UserRole)}
+                      style={{
+                        width: "100%",
+                        padding: 12,
+                        borderRadius: 12,
+                        border: "1px solid rgba(15,23,42,0.14)",
+                      }}
+                    >
+                      <option value="DRIVER">DRIVER (paxa)</option>
+                      <option value="COMPANY">COMPANY (skapa körningar)</option>
+                    </select>
+                  </div>
 
-      {mode === "login" && (
-        <>
-          <label>
-            Email
-            <input value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: "100%" }} />
-          </label>
+                  <div>
+                    <div style={{ fontWeight: 800, marginBottom: 6 }}>Namn</div>
+                    <input
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Ditt namn"
+                      style={{
+                        width: "100%",
+                        padding: 12,
+                        borderRadius: 12,
+                        border: "1px solid rgba(15,23,42,0.14)",
+                      }}
+                    />
+                  </div>
+                </>
+              )}
 
-          <label>
-            Lösenord
-            <input
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              type="password"
-              style={{ width: "100%" }}
-            />
-          </label>
+              <div>
+                <div style={{ fontWeight: 800, marginBottom: 6 }}>Email Address</div>
+                <input
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@example.com"
+                  style={{
+                    width: "100%",
+                    padding: 12,
+                    borderRadius: 12,
+                    border: "1px solid rgba(15,23,42,0.14)",
+                  }}
+                />
+              </div>
 
-          <button onClick={onLogin} disabled={busy} style={{ marginTop: 12 }}>
-            {busy ? "Jobbar..." : "Logga in"}
-          </button>
-        </>
-      )}
+              <div>
+                <div style={{ fontWeight: 800, marginBottom: 6 }}>Password</div>
+                <input
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  type="password"
+                  placeholder="••••••"
+                  style={{
+                    width: "100%",
+                    padding: 12,
+                    borderRadius: 12,
+                    border: "1px solid rgba(15,23,42,0.14)",
+                  }}
+                />
+              </div>
 
-      {err && <p style={{ color: "crimson", marginTop: 16 }}>Error: {err}</p>}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <a href="#" onClick={(e) => e.preventDefault()} style={{ fontSize: 13 }}>
+                  Forgot your password?
+                </a>
+                <span style={{ fontSize: 13, opacity: 0.75 }}>Next: {next}</span>
+              </div>
+
+              {mode === "login" ? (
+                <Button onClick={onLogin} loading={busy} disabled={!canSubmit}>
+                  Sign in
+                </Button>
+              ) : (
+                <Button onClick={onSignup} loading={busy} disabled={!canSubmit}>
+                  Sign up now
+                </Button>
+              )}
+
+              <div style={{ textAlign: "center", marginTop: 8 }}>
+                <Link to="/" style={{ fontSize: 13 }}>
+                  Tillbaka till Hem
+                </Link>
+              </div>
+            </div>
+          </Card>
+        </div>
+      </Container>
     </div>
   );
 }
