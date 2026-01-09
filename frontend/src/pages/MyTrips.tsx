@@ -21,13 +21,14 @@ export default function MyTrips() {
     try {
       setLoading(true);
       setErr(null);
+
       const data = await apiGet<Trip[]>("/trips/mine");
       setItems(data);
     } catch (e) {
       const msg = String(e);
       setErr(msg);
 
-      // Om token är expired/ogiltig: skicka till auth på ett snällt sätt
+      // Om token är expired/ogiltig: rensa token så appen "fattar" att man är utloggad
       if (msg.includes("401")) {
         setToken(null);
       }
@@ -38,6 +39,7 @@ export default function MyTrips() {
 
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const isAuthError = !!err && err.includes("401");
@@ -63,7 +65,7 @@ export default function MyTrips() {
           <div style={{ fontWeight: 900, marginBottom: 6 }}>Du behöver logga in igen</div>
           <Muted>Din session kan ha gått ut. Logga in och försök igen.</Muted>
           <Divider />
-          <Button onClick={() => nav("/auth")}>Logga in</Button>
+          <Button onClick={() => nav("/auth?next=/mine")}>Logga in</Button>
         </Card>
       )}
 
@@ -71,11 +73,10 @@ export default function MyTrips() {
         <Card>
           <div style={{ fontWeight: 800, marginBottom: 6 }}>Inga körningar ännu</div>
           <Muted>
-            Som företag: skapa en körning på “Create Trip”. Som driver: hitta en körning på startsidan och paxa.
+            Som företag: skapa en körning. Som förare: hitta en körning på startsidan och paxa.
           </Muted>
           <Divider />
           <Row>
-            {/* /explore är på väg bort → vi pekar till / */}
             <Link to="/">Hitta körningar</Link>
             <span style={{ opacity: 0.6 }}>•</span>
             <Link to="/create">Skapa körning</Link>

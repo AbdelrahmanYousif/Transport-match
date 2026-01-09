@@ -1,14 +1,6 @@
 import { useEffect, useState } from "react";
-import {
-  Link,
-  NavLink,
-  Navigate,
-  Route,
-  Routes,
-  useLocation,
-  useNavigate,
-} from "react-router-dom";
-import { apiGet, getToken, setToken, type Me } from "./api";
+import { Link, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { apiGet, getToken, setToken, type Me, type UserRole } from "./api";
 
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
@@ -19,15 +11,7 @@ import Faq from "./pages/Faq";
 
 function Logo() {
   return (
-    <Link
-      to="/"
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        textDecoration: "none",
-      }}
-    >
+    <Link to="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
       <div
         style={{
           width: 34,
@@ -37,9 +21,7 @@ function Logo() {
           boxShadow: "0 10px 24px rgba(0,0,0,0.14)",
         }}
       />
-      <span style={{ fontWeight: 900, letterSpacing: 0.2, color: "#0f172a" }}>
-        Transport Match
-      </span>
+      <span style={{ fontWeight: 900, letterSpacing: 0.2, color: "#0f172a" }}>Transport Match</span>
     </Link>
   );
 }
@@ -54,12 +36,20 @@ function TopNav({ me, onLogout }: { me: Me | null; onLogout: () => void }) {
     background: isActive ? "rgba(15, 23, 42, 0.06)" : "transparent",
   });
 
+  const linkLike = {
+    textDecoration: "none",
+    fontWeight: 800,
+    color: "rgba(15,23,42,0.75)",
+    padding: "10px 12px",
+    borderRadius: 12,
+  } as const;
+
   return (
     <div
       style={{
         position: "sticky",
         top: 0,
-        zIndex: 20,
+        zIndex: 10,
         background: "rgba(255,255,255,0.92)",
         backdropFilter: "blur(10px)",
         borderBottom: "1px solid rgba(15,23,42,0.08)",
@@ -82,17 +72,8 @@ function TopNav({ me, onLogout }: { me: Me | null; onLogout: () => void }) {
             Hem
           </NavLink>
 
-          {/* Mina körningar: om utloggad -> auth */}
-          <Link
-            to={me ? "/mine" : "/auth?next=/mine"}
-            style={{
-              textDecoration: "none",
-              fontWeight: 800,
-              color: "rgba(15,23,42,0.75)",
-              padding: "10px 12px",
-              borderRadius: 12,
-            }}
-          >
+          {/* Ska gå till auth om utloggad */}
+          <Link to={me ? "/mine" : "/auth?next=/mine"} style={linkLike}>
             Mina körningar
           </Link>
 
@@ -119,6 +100,7 @@ function TopNav({ me, onLogout }: { me: Me | null; onLogout: () => void }) {
                   padding: "10px 14px",
                   borderRadius: 14,
                   background: "rgba(15,23,42,0.06)",
+                  boxShadow: "0 10px 22px rgba(0,0,0,0.08)",
                 }}
               >
                 Skapa körning
@@ -167,24 +149,19 @@ function RequireAuth({ me, children }: { me: Me | null; children: React.ReactNod
   return <>{children}</>;
 }
 
-function AuthRoute({ onAuthed }: { onAuthed: (m: Me) => void }) {
-  const nav = useNavigate();
+function RequireRole({
+  me,
+  role,
+  children,
+}: {
+  me: Me | null;
+  role: UserRole;
+  children: React.ReactNode;
+}) {
   const loc = useLocation();
-
-  // stöd för både ?next= och state.from
-  const search = new URLSearchParams(loc.search);
-  const nextFromQuery = search.get("next");
-  const fromState = (loc.state as { from?: string } | null)?.from;
-  const next = nextFromQuery || fromState || "/";
-
-  return (
-    <Auth
-      onAuthed={(m) => {
-        onAuthed(m);
-        nav(next, { replace: true });
-      }}
-    />
-  );
+  if (!me) return <Navigate to="/auth" state={{ from: loc.pathname + loc.search }} replace />;
+  if (me.role !== role) return <Navigate to="/" replace />;
+  return <>{children}</>;
 }
 
 export default function App() {
@@ -228,13 +205,13 @@ export default function App() {
 
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "22px 16px" }}>
         <Routes>
-          {/* STARTSIDAN = Landing (Home+Explore) */}
+          {/* ✅ Home + Explore i samma sida */}
           <Route path="/" element={<Landing me={me} />} />
 
-          {/* Auth */}
-          <Route path="/auth" element={<AuthRoute onAuthed={setMe} />} />
+          {/* Auth sköter redirect själv (next/from) */}
+          <Route path="/auth" element={<Auth onAuthed={(m) => setMe(m)} />} />
 
-          {/* Mina körningar kräver login */}
+          {/* Skyddade routes */}
           <Route
             path="/mine"
             element={
@@ -244,24 +221,24 @@ export default function App() {
             }
           />
 
-          {/* Skapa körning: kräver login (och din sida/endpoint skyddar via backend ändå) */}
           <Route
             path="/create"
             element={
-              <RequireAuth me={me}>
+              <RequireRole me={me} role="COMPANY">
                 <CreateTrip />
-              </RequireAuth>
+              </RequireRole>
             }
           />
 
-          {/* Trip detail ska fungera även utan login */}
+          {/* Publik: Trip detail */}
           <Route path="/trips/:id" element={<TripDetailPage me={me} />} />
 
           <Route path="/faq" element={<Faq />} />
 
-          {/* Fasa ut /explore -> / */}
+          {/* ✅ Backwards compat: /explore → / */}
           <Route path="/explore" element={<Navigate to="/" replace />} />
 
+          {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
