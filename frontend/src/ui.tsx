@@ -1,10 +1,14 @@
-import React from "react";
+import type {
+  ButtonHTMLAttributes,
+  CSSProperties,
+  ReactNode,
+} from "react";
 
 type Tone = "neutral" | "success" | "warning" | "danger";
 
 type BaseProps = {
-  children?: React.ReactNode;
-  style?: React.CSSProperties;
+  children?: ReactNode;
+  style?: CSSProperties;
   className?: string;
 };
 
@@ -20,19 +24,36 @@ const COLORS = {
 };
 
 function toneStyles(tone: Tone) {
-  if (tone === "success") return { bg: "rgba(34,197,94,0.12)", fg: "#166534", bd: "rgba(34,197,94,0.25)" };
-  if (tone === "warning") return { bg: "rgba(245,158,11,0.14)", fg: "#92400e", bd: "rgba(245,158,11,0.28)" };
-  if (tone === "danger") return { bg: "rgba(239,68,68,0.12)", fg: "#991b1b", bd: "rgba(239,68,68,0.25)" };
+  if (tone === "success")
+    return {
+      bg: "rgba(34,197,94,0.12)",
+      fg: "#166534",
+      bd: "rgba(34,197,94,0.25)",
+    };
+  if (tone === "warning")
+    return {
+      bg: "rgba(245,158,11,0.14)",
+      fg: "#92400e",
+      bd: "rgba(245,158,11,0.28)",
+    };
+  if (tone === "danger")
+    return {
+      bg: "rgba(239,68,68,0.12)",
+      fg: "#991b1b",
+      bd: "rgba(239,68,68,0.25)",
+    };
   return { bg: "rgba(15,23,42,0.06)", fg: COLORS.text, bd: COLORS.border };
 }
 
 export function Container({
   children,
   style,
+  className,
   maxWidth = 1100,
 }: BaseProps & { maxWidth?: number }) {
   return (
     <div
+      className={className}
       style={{
         maxWidth,
         margin: "0 auto",
@@ -45,9 +66,10 @@ export function Container({
   );
 }
 
-export function Card({ children, style }: BaseProps) {
+export function Card({ children, style, className }: BaseProps) {
   return (
     <div
+      className={className}
       style={{
         background: COLORS.bg,
         border: `1px solid ${COLORS.border}`,
@@ -65,16 +87,18 @@ export function Card({ children, style }: BaseProps) {
 export function Row({
   children,
   style,
+  className,
   gap = 10,
   align = "center",
   wrap = true,
 }: BaseProps & {
   gap?: number;
-  align?: React.CSSProperties["alignItems"];
+  align?: CSSProperties["alignItems"];
   wrap?: boolean;
 }) {
   return (
     <div
+      className={className}
       style={{
         display: "flex",
         alignItems: align,
@@ -92,9 +116,10 @@ export function Spacer() {
   return <div style={{ flex: 1 }} />;
 }
 
-export function Divider({ style }: { style?: React.CSSProperties }) {
+export function Divider({ style, className }: { style?: CSSProperties; className?: string }) {
   return (
     <hr
+      className={className}
       style={{
         border: "none",
         borderTop: `1px solid ${COLORS.border}`,
@@ -105,9 +130,10 @@ export function Divider({ style }: { style?: React.CSSProperties }) {
   );
 }
 
-export function H1({ children, style }: BaseProps) {
+export function H1({ children, style, className }: BaseProps) {
   return (
     <h1
+      className={className}
       style={{
         margin: "0 0 8px",
         fontSize: 34,
@@ -122,9 +148,10 @@ export function H1({ children, style }: BaseProps) {
   );
 }
 
-export function Muted({ children, style }: BaseProps) {
+export function Muted({ children, style, className }: BaseProps) {
   return (
     <div
+      className={className}
       style={{
         color: COLORS.muted,
         fontSize: 14,
@@ -140,10 +167,12 @@ export function Alert({
   children,
   tone = "neutral",
   style,
+  className,
 }: BaseProps & { tone?: Tone }) {
   const t = toneStyles(tone);
   return (
     <div
+      className={className}
       style={{
         background: t.bg,
         color: t.fg,
@@ -163,10 +192,12 @@ export function Badge({
   children,
   tone = "neutral",
   style,
+  className,
 }: BaseProps & { tone?: Tone }) {
   const t = toneStyles(tone);
   return (
     <span
+      className={className}
       style={{
         display: "inline-flex",
         alignItems: "center",
@@ -194,15 +225,17 @@ export function Button({
   disabled,
   children,
   style,
+  onMouseDown,
+  onMouseUp,
   ...props
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
   loading?: boolean;
-  style?: React.CSSProperties;
+  style?: CSSProperties;
 }) {
   const isDisabled = disabled || loading;
 
-  const base: React.CSSProperties = {
+  const base: CSSProperties = {
     cursor: isDisabled ? "not-allowed" : "pointer",
     borderRadius: 14,
     padding: "10px 14px",
@@ -213,7 +246,7 @@ export function Button({
     opacity: isDisabled ? 0.65 : 1,
   };
 
-  const variants: Record<ButtonVariant, React.CSSProperties> = {
+  const variants: Record<ButtonVariant, CSSProperties> = {
     primary: {
       background: COLORS.primary,
       color: "white",
@@ -249,11 +282,14 @@ export function Button({
         ...style,
       }}
       onMouseDown={(e) => {
+        onMouseDown?.(e);
         if (isDisabled) return;
-        (e.currentTarget as HTMLButtonElement).style.transform = "translateY(1px)";
+        e.currentTarget.style.transform = "translateY(1px)";
       }}
       onMouseUp={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0px)";
+        onMouseUp?.(e);
+        if (isDisabled) return;
+        e.currentTarget.style.transform = "translateY(0px)";
       }}
     >
       {loading ? "Jobbar..." : children}

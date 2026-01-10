@@ -1,0 +1,62 @@
+Home page
+
+- Logga
+- Ändra subheader till- En smart marknadsplats där transportbehov möter resor som redan ska göras.
+- Ändra Origin, Destination, Date- Startort, Slutort, Datum
+- Fixa placering av fältarna under så dom är under och överlappar inte med varandra
+- Ändra Alla tillgängliga resor
+Visar OPEN-körningar. Klicka på en resa för detaljer. till- Öppna körningar 
+Klicka på en resa för detaljer.
+- Ta bort mina körningar som är till höger
+
+FAQ
+
+- Ändra Hur funkar det?
+Företag skapar en körning. Förare kan se OPEN-körningar och paxa. När en körning paxas blir den RESERVED. 
+till: Så fungerar Transport Match
+Företag lägger upp en körning. Förare kan bläddra bland körningar med status Öppen och paxa en som passar. När den paxas blir den Reserverad.
+- Ändra Måste jag ha konto för att se körningar?
+Nej, du kan se listan och trip-detaljer utan konto. För att paxa måste du logga in.
+till: Måste jag ha konto för att se körningar?
+Nej. Du kan se listan och detaljer om varje resa utan konto. För att paxa en körning behöver du logga in.
+- Ändra Vem kan se vem som paxat?
+Endast företaget som äger trippen kan se vilken driver som paxat (om trippen är RESERVED).
+till: Vem kan se vem som paxat?
+Endast företaget som skapat körningen kan se vilken förare som paxat – och bara när körningen är Reserverad.
+
+Logga in/skapa konto
+
+- Ändra Transport Match
+Hitta lediga körningar direkt. Logga in för att paxa (DRIVER) eller skapa körningar (COMPANY).
+till: Transport Match
+Se lediga körningar direkt. Logga in för att paxa som förare eller skapa körningar som företag.
+
+Efter inloggning som företag:
+
+Home page
+
+- Samma som home page innan inloggning som företag +
+- Ta bort "Gå vidare knapp"
+- Ändra färg på Skapa körning knapp till samma som logga in färg
+- Ändra inloggad som COMPANY till FÖRETAG
+
+Skapa körning
+
+- Ändra allt till svenska: Create trip till skapa körning Här skapar företag en körning som drivers kan paxa. Fyll i detaljer och skapa.
+till Här skapar företag en körning som förare kan paxa. Fyll i uppgifterna och klicka på Skapa. Origin till Startort Destination till Slutort Date till Datum Time window till Tidsfönster Compensation till Ersättning Vehicle info till Bil
+Skapa trip till skapa körning reset till Nollställ
+- Fixa så att alla ifyllbara fältar inte sticker ut från kortet dom sitter på
+- Ta bort Till Mina Körningar knappen
+
+Mina Körningar
+
+- Ta bort uppdatera knappen 
+- Istället för att det ska stå OPEN eller RESERVED ska det stå ÖPPEN eller RESERVERAD på körningens status
+
+TripDetail 
+
+- Ta bort där det står Hem och Mina körningar med ett understräck (inte i nav bar) 
+- Översätt allt till svenska istället för Trip ska det vara Körning så körning #1 #2 osv. Status: OPEN till Status: ÖPPEN
+- Ändra Ingen driver synlig (OPEN eller så är du inte företaget som äger trippen). Avboka (cancel) till bara Avboka
+till: Ingen förare visas (körningen är Öppen eller så äger du inte körningen).
+- Avboka knapp ska faktiskt avboka nu får jag bara ett fel meddelande error 404 ...
