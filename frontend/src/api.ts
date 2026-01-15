@@ -1,4 +1,5 @@
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL as string;
+export const API_BASE_URL =
+  ((import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "http://127.0.0.1:8000").replace(/\/$/, "");
 
 const TIMEOUT_MS = 45000; // 45s så den inte hänger för evigt
 

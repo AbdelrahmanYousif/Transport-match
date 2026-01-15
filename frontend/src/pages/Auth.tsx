@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { apiGet, apiPostForm, apiPostJson, setToken, type Me, type UserRole } from "../api";
 import { Alert, Button, Card, Container, Muted } from "../ui";
@@ -8,8 +8,7 @@ type Mode = "login" | "signup";
 type LoginRes = { access_token: string; token_type: string };
 type SignupRes = { access_token: string; token_type: string };
 
-// Stabil Unsplash-bild (byt gärna till annan om du vill)
-// Tips: om du vill ha 100% kontroll: lägg en bild i /frontend/public/auth-bg.jpg och använd url("/auth-bg.jpg")
+// Tips: lägg en bild i /frontend/public/auth-bg.jpg och använd url("/auth-bg.jpg")
 const AUTH_BG =
   "linear-gradient(0deg, rgba(15,23,42,0.62), rgba(15,23,42,0.62)), url('/auth-bg.jpg') center/cover";
 
@@ -88,6 +87,17 @@ export default function Auth({ onAuthed }: { onAuthed: (m: Me) => void }) {
     }
   }
 
+  // ✅ Viktigt: boxSizing + maxWidth gör att inputs/select aldrig “sticker ut”
+  const fieldStyle: CSSProperties = {
+    width: "100%",
+    maxWidth: "100%",
+    boxSizing: "border-box",
+    padding: 12,
+    borderRadius: 12,
+    border: "1px solid rgba(15,23,42,0.14)",
+    display: "block",
+  };
+
   return (
     <div
       style={{
@@ -109,6 +119,7 @@ export default function Auth({ onAuthed }: { onAuthed: (m: Me) => void }) {
           grid-template-columns: 1fr;
           gap: 18px;
           align-items: center;
+          min-width: 0;
         }
         @media (min-width: 980px) {
           .authGrid {
@@ -122,18 +133,26 @@ export default function Auth({ onAuthed }: { onAuthed: (m: Me) => void }) {
       <Container maxWidth={1100}>
         <div className="authGrid">
           {/* Vänster: hero/text */}
-          <div style={{ color: "rgba(255,255,255,0.92)", padding: 8, maxWidth: 560 }}>
+          <div style={{ color: "rgba(255,255,255,0.92)", padding: 8, maxWidth: 560, minWidth: 0 }}>
             <div style={{ fontWeight: 950, fontSize: 52, lineHeight: 1.02, letterSpacing: 0.2 }}>
               Transport Match
             </div>
 
             <div style={{ marginTop: 12, fontSize: 16, lineHeight: 1.5, maxWidth: 520 }}>
-              Hitta lediga körningar direkt. Logga in för att paxa (DRIVER) eller skapa körningar (COMPANY).
+              Se lediga körningar direkt. Logga in för att paxa som förare eller skapa körningar som företag.
             </div>
           </div>
 
           {/* Höger: kort */}
-          <Card style={{ width: "100%", padding: 22, borderRadius: 20 }}>
+          <Card
+            style={{
+              width: "100%",
+              padding: 22,
+              borderRadius: 20,
+              overflow: "hidden", // ✅ extra skydd ifall något ändå blir större
+              minWidth: 0,
+            }}
+          >
             <div style={{ textAlign: "center", marginBottom: 12 }}>
               <div style={{ fontWeight: 950, fontSize: 34, letterSpacing: 0.2 }}>
                 {mode === "login" ? "Logga in" : "Skapa konto"}
@@ -177,60 +196,45 @@ export default function Auth({ onAuthed }: { onAuthed: (m: Me) => void }) {
               </button>
             </div>
 
-            <div style={{ display: "grid", gap: 10 }}>
+            <div style={{ display: "grid", gap: 10, minWidth: 0 }}>
               {mode === "signup" && (
                 <>
-                  <div>
+                  <div style={{ minWidth: 0 }}>
                     <div style={{ fontWeight: 900, marginBottom: 6 }}>Roll</div>
                     <select
                       value={role}
                       onChange={(e) => setRole(e.target.value as UserRole)}
-                      style={{
-                        width: "100%",
-                        padding: 12,
-                        borderRadius: 12,
-                        border: "1px solid rgba(15,23,42,0.14)",
-                      }}
+                      style={fieldStyle}
                     >
-                      <option value="DRIVER">DRIVER (paxa)</option>
-                      <option value="COMPANY">COMPANY (skapa körningar)</option>
+                      <option value="DRIVER">Förare</option>
+                      <option value="COMPANY">Företag</option>
                     </select>
                   </div>
 
-                  <div>
+                  <div style={{ minWidth: 0 }}>
                     <div style={{ fontWeight: 900, marginBottom: 6 }}>Namn</div>
                     <input
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="Ditt namn"
-                      style={{
-                        width: "100%",
-                        padding: 12,
-                        borderRadius: 12,
-                        border: "1px solid rgba(15,23,42,0.14)",
-                      }}
+                      style={fieldStyle}
                     />
                   </div>
                 </>
               )}
 
-              <div>
+              <div style={{ minWidth: 0 }}>
                 <div style={{ fontWeight: 900, marginBottom: 6 }}>E-postadress</div>
                 <input
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="namn@exempel.se"
                   autoComplete="email"
-                  style={{
-                    width: "100%",
-                    padding: 12,
-                    borderRadius: 12,
-                    border: "1px solid rgba(15,23,42,0.14)",
-                  }}
+                  style={fieldStyle}
                 />
               </div>
 
-              <div>
+              <div style={{ minWidth: 0 }}>
                 <div style={{ fontWeight: 900, marginBottom: 6 }}>Lösenord</div>
                 <input
                   value={password}
@@ -238,12 +242,7 @@ export default function Auth({ onAuthed }: { onAuthed: (m: Me) => void }) {
                   type="password"
                   placeholder="••••••"
                   autoComplete={mode === "login" ? "current-password" : "new-password"}
-                  style={{
-                    width: "100%",
-                    padding: 12,
-                    borderRadius: 12,
-                    border: "1px solid rgba(15,23,42,0.14)",
-                  }}
+                  style={fieldStyle}
                 />
               </div>
 

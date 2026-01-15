@@ -1,34 +1,41 @@
-import { Container, Card, H1, Muted, Divider } from "../ui";
+import { Card, Container, Divider, H1, Muted } from "../ui";
 
 export default function Faq() {
   return (
-    <Container maxWidth={900}>
-      <H1 style={{ marginTop: 0 }}>FAQ</H1>
+    <Container maxWidth={880}>
+      <H1>FAQ</H1>
       <Muted>Vanliga frågor om Transport Match.</Muted>
 
-      <div style={{ marginTop: 12, display: "grid", gap: 12 }}>
-        <Card>
-          <div style={{ fontWeight: 900 }}>Hur funkar det?</div>
-          <Divider />
-          <Muted>
-            Företag skapar en körning. Förare kan se OPEN-körningar och paxa. När en körning paxas blir den RESERVED.
-          </Muted>
-        </Card>
+      <Divider />
 
-        <Card>
-          <div style={{ fontWeight: 900 }}>Måste jag ha konto för att se körningar?</div>
-          <Divider />
-          <Muted>Nej, du kan se listan och trip-detaljer utan konto. För att paxa måste du logga in.</Muted>
-        </Card>
+      <Card>
+        <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 6 }}>
+          Så fungerar Transport Match
+        </div>
+        <Muted>
+          Företag lägger upp en körning. Förare kan bläddra bland körningar med status <b>Öppen</b> och paxa en som
+          passar. När den paxas blir den <b>Reserverad</b>.
+        </Muted>
 
-        <Card>
-          <div style={{ fontWeight: 900 }}>Vem kan se vem som paxat?</div>
-          <Divider />
-          <Muted>
-            Endast företaget som äger trippen kan se vilken driver som paxat (om trippen är RESERVED).
-          </Muted>
-        </Card>
-      </div>
+        <Divider />
+
+        <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 6 }}>
+          Måste jag ha konto för att se körningar?
+        </div>
+        <Muted>
+          Nej. Du kan se listan och detaljer om varje resa utan konto. För att paxa en körning behöver du logga in.
+        </Muted>
+
+        <Divider />
+
+        <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 6 }}>
+          Vem kan se vem som paxat?
+        </div>
+        <Muted>
+          Endast företaget som skapat körningen kan se vilken förare som paxat – och bara när körningen är{" "}
+          <b>Reserverad</b>.
+        </Muted>
+      </Card>
     </Container>
   );
 }

@@ -1,13 +1,21 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { apiGet, setToken, type Trip } from "../api";
-import { Alert, Badge, Button, Card, Container, Divider, H1, Muted, Row, Spacer } from "../ui";
+import { Alert, Badge, Card, Container, Divider, H1, Muted, Row, Spacer } from "../ui";
 
 function statusTone(status: string) {
   if (status === "COMPLETED") return "success";
   if (status === "RESERVED") return "warning";
   if (status === "CANCELLED") return "danger";
   return "neutral"; // OPEN
+}
+
+function statusLabel(status: Trip["status"]) {
+  if (status === "OPEN") return "ÖPPEN";
+  if (status === "RESERVED") return "RESERVERAD";
+  if (status === "COMPLETED") return "KLAR";
+  if (status === "CANCELLED") return "AVBOKAD";
+  return status;
 }
 
 export default function MyTrips() {
@@ -21,14 +29,13 @@ export default function MyTrips() {
     try {
       setLoading(true);
       setErr(null);
-
       const data = await apiGet<Trip[]>("/trips/mine");
       setItems(data);
     } catch (e) {
       const msg = String(e);
       setErr(msg);
 
-      // Om token är expired/ogiltig: rensa token så appen "fattar" att man är utloggad
+      // Om token är expired/ogiltig
       if (msg.includes("401")) {
         setToken(null);
       }
@@ -39,20 +46,17 @@ export default function MyTrips() {
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const isAuthError = !!err && err.includes("401");
+  const isAuthError = useMemo(() => !!err && err.includes("401"), [err]);
 
   return (
     <Container maxWidth={880}>
       <Row style={{ marginBottom: 12 }}>
         <H1>Mina körningar</H1>
-        <Spacer />
-        <Button variant="secondary" onClick={load} loading={loading}>
-          Uppdatera
-        </Button>
       </Row>
+
+      {loading && <Muted>Laddar...</Muted>}
 
       {err && (
         <div style={{ marginBottom: 12 }}>
@@ -65,7 +69,16 @@ export default function MyTrips() {
           <div style={{ fontWeight: 900, marginBottom: 6 }}>Du behöver logga in igen</div>
           <Muted>Din session kan ha gått ut. Logga in och försök igen.</Muted>
           <Divider />
-          <Button onClick={() => nav("/auth?next=/mine")}>Logga in</Button>
+          <a
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              nav("/auth?next=/mine");
+            }}
+            style={{ fontWeight: 900 }}
+          >
+            Logga in
+          </a>
         </Card>
       )}
 
@@ -108,7 +121,7 @@ export default function MyTrips() {
 
                 <Spacer />
 
-                <Badge tone={statusTone(t.status)}>{t.status}</Badge>
+                <Badge tone={statusTone(t.status)}>{statusLabel(t.status)}</Badge>
               </Row>
             </Card>
           ))}

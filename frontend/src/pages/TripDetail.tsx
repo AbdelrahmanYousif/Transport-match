@@ -1,7 +1,16 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { apiDelete, apiGet, apiPostJson, getToken, type Me, type TripDetail } from "../api";
+import { useNavigate, useParams } from "react-router-dom";
+import { apiDelete, apiGet, apiPostJson, getToken, type Me, type Trip, type TripDetail } from "../api";
 import { Alert, Button, Card, Container, Divider, H1, Muted, Row, Spacer } from "../ui";
+
+function statusLabel(status?: string) {
+  if (!status) return "-";
+  if (status === "OPEN") return "ÖPPEN";
+  if (status === "RESERVED") return "RESERVERAD";
+  if (status === "COMPLETED") return "KLAR";
+  if (status === "CANCELLED") return "AVBOKAD";
+  return status;
+}
 
 export default function TripDetailPage({ me }: { me: Me | null }) {
   const { id } = useParams();
@@ -9,6 +18,7 @@ export default function TripDetailPage({ me }: { me: Me | null }) {
   const nav = useNavigate();
 
   const [data, setData] = useState<TripDetail | null>(null);
+  const [fallbackTrip, setFallbackTrip] = useState<Trip | null>(null); // utloggad (från /trips)
   const [loading, setLoading] = useState(false);
   const [action, setAction] = useState<null | "reserve" | "unreserve" | "complete" | "cancel">(null);
   const [err, setErr] = useState<string | null>(null);
@@ -17,11 +27,22 @@ export default function TripDetailPage({ me }: { me: Me | null }) {
     try {
       setLoading(true);
       setErr(null);
-      const d = await apiGet<TripDetail>(`/trips/${tripId}`); // ✅ publik, och skickar token om den finns
-      setData(d);
+
+      // Inloggad: detalj-endpoint (kan visa reserved_driver om rätt företag)
+      if (getToken()) {
+        const d = await apiGet<TripDetail>(`/trips/${tripId}`);
+        setData(d);
+        setFallbackTrip(null);
+        return;
+      }
+
+      // Utloggad: bara OPEN finns i listan
+      const openTrips = await apiGet<Trip[]>("/trips");
+      const t = openTrips.find((x) => x.id === tripId) ?? null;
+      setFallbackTrip(t);
+      setData(null);
     } catch (e) {
       setErr(String(e));
-      setData(null);
     } finally {
       setLoading(false);
     }
@@ -34,7 +55,7 @@ export default function TripDetailPage({ me }: { me: Me | null }) {
   }, [tripId]);
 
   async function runAction(key: typeof action, fn: () => Promise<void>) {
-    // Utloggad → till auth och tillbaka
+    // inte inloggad? → auth och tillbaka hit
     if (!getToken()) {
       nav(`/auth?next=/trips/${tripId}`);
       return;
@@ -55,57 +76,63 @@ export default function TripDetailPage({ me }: { me: Me | null }) {
   if (!Number.isFinite(tripId)) {
     return (
       <Container>
-        <Alert tone="danger">Ogiltigt trip-id.</Alert>
+        <Alert tone="danger">Ogiltigt id.</Alert>
       </Container>
     );
   }
 
+  const trip = data?.trip ?? fallbackTrip;
+
   return (
-    <Container maxWidth={880}>
+    <Container>
       <Row style={{ marginBottom: 12 }}>
         <Button variant="secondary" onClick={() => nav(-1)}>
           ← Tillbaka
         </Button>
-
-        <Link to="/">Hem</Link>
-        <Link to="/mine">Mina körningar</Link>
-
         <Spacer />
       </Row>
 
-      <H1>Trip #{tripId}</H1>
+      <H1>Körning #{tripId}</H1>
 
       {loading && <Muted>Laddar...</Muted>}
 
       {err && (
         <div style={{ marginBottom: 12 }}>
-          <Alert tone="danger">Error: {err}</Alert>
+          <Alert tone="danger">Fel: {err}</Alert>
         </div>
       )}
 
-      {!data && !loading && (
+      {!trip && !loading && (
         <Card>
-          <div style={{ fontWeight: 900, marginBottom: 6 }}>Trippen hittades inte</div>
-          <Muted>Testa igen, eller gå tillbaka till Hem.</Muted>
+          <div style={{ fontWeight: 900, marginBottom: 6 }}>Körningen hittades inte</div>
+          <Muted>
+            Om du är utloggad visas bara ÖPPNA körningar. Logga in för att se fler detaljer.
+          </Muted>
+          <Divider />
+          <Button onClick={() => nav(`/auth?next=/trips/${tripId}`)}>Logga in</Button>
         </Card>
       )}
 
-      {data && (
+      {trip && (
         <Card>
           <Row style={{ alignItems: "flex-start" }}>
             <div>
               <div style={{ fontWeight: 900, fontSize: 18 }}>
-                {data.trip.origin} → {data.trip.destination}
+                {trip.origin} → {trip.destination}
               </div>
+
               <Muted>
-                Datum: {data.trip.date ?? "-"} • Tid: {data.trip.time_window ?? "-"}
+                Datum: {trip.date ?? "-"} • Tid: {trip.time_window ?? "-"}
               </Muted>
+
               <div style={{ marginTop: 8 }}>
-                Ersättning: <b>{data.trip.compensation_sek} SEK</b>
+                Ersättning: <b>{trip.compensation_sek} SEK</b>
               </div>
-              {data.trip.vehicle_info && <div>Bil: {data.trip.vehicle_info}</div>}
+
+              {trip.vehicle_info && <div>Bil: {trip.vehicle_info}</div>}
+
               <div style={{ marginTop: 6 }}>
-                Status: <b>{data.trip.status}</b>
+                Status: <b>{statusLabel(trip.status)}</b>
               </div>
             </div>
 
@@ -114,8 +141,8 @@ export default function TripDetailPage({ me }: { me: Me | null }) {
 
           <Divider />
 
-          {/* reserved_driver syns bara om backend skickar (company som äger trippen) */}
-          {data.reserved_driver ? (
+          {/* Paxad av: bara om backend gav det */}
+          {data?.reserved_driver ? (
             <Card style={{ padding: 12, borderRadius: 12, boxShadow: "none" }}>
               <div style={{ fontWeight: 900, marginBottom: 6 }}>Paxad av</div>
               <div>{data.reserved_driver.name}</div>
@@ -123,26 +150,26 @@ export default function TripDetailPage({ me }: { me: Me | null }) {
             </Card>
           ) : (
             <Muted>
-              {!getToken()
-                ? "Logga in för att paxa eller se mer detaljer."
-                : "Ingen driver synlig (OPEN eller så är du inte företaget som äger trippen)."}
+              {getToken()
+                ? "Ingen förare visas (körningen är Öppen eller så äger du inte körningen)."
+                : "Logga in för att paxa eller se mer detaljer."}
             </Muted>
           )}
 
           <Divider />
 
           <Row>
-            {/* DRIVER actions */}
-            {me?.role === "DRIVER" && data.trip.status === "OPEN" && (
+            {/* FÖRARE */}
+            {me?.role === "DRIVER" && trip.status === "OPEN" && (
               <Button
                 onClick={() => runAction("reserve", () => apiPostJson(`/trips/${tripId}/reserve`, {}))}
                 loading={action === "reserve"}
               >
-                Paxa denna trip
+                Paxa körning
               </Button>
             )}
 
-            {me?.role === "DRIVER" && data.trip.status === "RESERVED" && (
+            {me?.role === "DRIVER" && trip.status === "RESERVED" && (
               <Button
                 variant="secondary"
                 onClick={() => runAction("unreserve", () => apiDelete(`/trips/${tripId}/reserve`))}
@@ -152,35 +179,33 @@ export default function TripDetailPage({ me }: { me: Me | null }) {
               </Button>
             )}
 
-            {/* COMPANY actions */}
-            {me?.role === "COMPANY" && data.trip.status === "RESERVED" && (
+            {/* FÖRETAG */}
+            {me?.role === "COMPANY" && trip.status === "RESERVED" && (
               <Button
                 onClick={() => runAction("complete", () => apiPostJson(`/trips/${tripId}/complete`, {}))}
                 loading={action === "complete"}
               >
-                Markera Completed
+                Markera som klar
               </Button>
             )}
 
-            {me?.role === "COMPANY" && (data.trip.status === "OPEN" || data.trip.status === "RESERVED") && (
+            {me?.role === "COMPANY" && (trip.status === "OPEN" || trip.status === "RESERVED") && (
               <Button
                 variant="ghost"
                 onClick={() => runAction("cancel", () => apiPostJson(`/trips/${tripId}/cancel`, {}))}
                 loading={action === "cancel"}
               >
-                Avboka (Cancel)
+                Avboka
               </Button>
             )}
 
             {/* Utloggad CTA */}
             {!getToken() && (
-              <Button onClick={() => nav(`/auth?next=/trips/${tripId}`)}>Logga in för att paxa</Button>
+              <Button onClick={() => nav(`/auth?next=/trips/${tripId}`)}>
+                Logga in för att paxa
+              </Button>
             )}
           </Row>
-
-          <div style={{ marginTop: 10 }}>
-            <Muted>Knapparna visas bara när de är relevanta (roll + status).</Muted>
-          </div>
         </Card>
       )}
     </Container>

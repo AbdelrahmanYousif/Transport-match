@@ -1,42 +1,49 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiPostJson } from "../api";
-import { Alert, Button, Card, Container, H1, Muted, Row, Spacer } from "../ui";
-
-function isLikelyISODate(s: string) {
-  // enkel check: YYYY-MM-DD
-  return /^\d{4}-\d{2}-\d{2}$/.test(s);
-}
+import { apiPostJson, type Trip } from "../api";
+import { Alert, Button, Card, Container, Divider, H1, Muted, Row } from "../ui";
 
 export default function CreateTrip() {
   const nav = useNavigate();
 
-  const [err, setErr] = useState<string | null>(null);
+  const [origin, setOrigin] = useState("");
+  const [destination, setDestination] = useState("");
+  const [date, setDate] = useState(""); // YYYY-MM-DD
+  const [timeWindow, setTimeWindow] = useState(""); // t.ex. 10:00-14:00
+  const [compensation, setCompensation] = useState<string>(""); // håller string i input
+  const [vehicleInfo, setVehicleInfo] = useState("");
+
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
-  const [origin, setOrigin] = useState("Stockholm");
-  const [destination, setDestination] = useState("Uppsala");
-  const [date, setDate] = useState("2025-12-23");
-  const [timeWindow, setTimeWindow] = useState("08-12");
-  const [compensationSek, setCompensationSek] = useState<number>(500);
-  const [vehicleInfo, setVehicleInfo] = useState("Volvo V60");
+  const canSubmit = useMemo(() => {
+    if (!origin.trim()) return false;
+    if (!destination.trim()) return false;
+    const c = Number(compensation);
+    if (!Number.isFinite(c) || c <= 0) return false;
+    return true;
+  }, [origin, destination, compensation]);
 
-  const validationError = useMemo(() => {
-    if (!origin.trim()) return "Origin kan inte vara tom.";
-    if (!destination.trim()) return "Destination kan inte vara tom.";
-    if (!date.trim()) return "Datum krävs.";
-    if (!isLikelyISODate(date.trim())) return "Datum måste vara i format YYYY-MM-DD.";
-    if (Number.isNaN(Number(compensationSek))) return "Compensation måste vara ett nummer.";
-    if (Number(compensationSek) < 0) return "Compensation kan inte vara negativ.";
-    return null;
-  }, [origin, destination, date, compensationSek]);
+  const inputStyle: React.CSSProperties = {
+    width: "100%",
+    boxSizing: "border-box",
+    padding: 12,
+    borderRadius: 12,
+    border: "1px solid rgba(15,23,42,0.14)",
+    outline: "none",
+  };
 
-  async function createTrip() {
-    if (validationError) {
-      setErr(validationError);
-      return;
-    }
+  function reset() {
+    setOrigin("");
+    setDestination("");
+    setDate("");
+    setTimeWindow("");
+    setCompensation("");
+    setVehicleInfo("");
+    setErr(null);
+  }
 
+  async function onCreate() {
     try {
       setBusy(true);
       setErr(null);
@@ -44,16 +51,20 @@ export default function CreateTrip() {
       const payload = {
         origin: origin.trim(),
         destination: destination.trim(),
-        date: date.trim(),
-        time_window: timeWindow.trim() || null,
-        compensation_sek: Number(compensationSek),
-        vehicle_info: vehicleInfo.trim() || null,
+        date: date.trim() ? date.trim() : null,
+        time_window: timeWindow.trim() ? timeWindow.trim() : null,
+        compensation_sek: Number(compensation),
+        vehicle_info: vehicleInfo.trim() ? vehicleInfo.trim() : null,
       };
 
-      await apiPostJson("/trips", payload);
+      const created = await apiPostJson<Trip>("/trips", payload);
 
-      // “riktigt” flöde: efter skapad trip -> mina körningar
-      nav("/mine");
+      // Efter skapad körning: ta dig till Mina körningar
+      nav("/mine", { replace: true });
+
+      // (om du hellre vill direkt till detaljsidan:)
+      // nav(`/trips/${created.id}`, { replace: true });
+      void created;
     } catch (e) {
       setErr(String(e));
     } finally {
@@ -64,121 +75,101 @@ export default function CreateTrip() {
   return (
     <Container maxWidth={880}>
       <Row style={{ marginBottom: 12 }}>
-        <H1>Create Trip</H1>
-        <Spacer />
-        <Button variant="secondary" onClick={() => nav("/mine")}>
-          Till Mina körningar
-        </Button>
+        <H1>Skapa körning</H1>
       </Row>
 
-      <Muted>
-        Här skapar företag en körning som drivers kan paxa. Fyll i detaljer och skapa.
-      </Muted>
+      <Card>
+        <Muted>
+          Här skapar företag en körning som förare kan paxa. Fyll i uppgifterna och klicka på <b>Skapa</b>.
+        </Muted>
 
-      {err && (
-        <div style={{ marginTop: 12 }}>
-          <Alert tone="danger">Error: {err}</Alert>
-        </div>
-      )}
+        <Divider />
 
-      <div style={{ marginTop: 14, maxWidth: 560 }}>
-        <Card>
-          <div style={{ display: "grid", gap: 10 }}>
-            <label>
-              <div style={{ fontWeight: 700, marginBottom: 6 }}>Origin</div>
-              <input
-                value={origin}
-                onChange={(e) => setOrigin(e.target.value)}
-                style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #ddd" }}
-              />
-            </label>
+        {err && (
+          <div style={{ marginBottom: 12 }}>
+            <Alert tone="danger">{err}</Alert>
+          </div>
+        )}
 
-            <label>
-              <div style={{ fontWeight: 700, marginBottom: 6 }}>Destination</div>
-              <input
-                value={destination}
-                onChange={(e) => setDestination(e.target.value)}
-                style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #ddd" }}
-              />
-            </label>
+        <div style={{ display: "grid", gap: 12 }}>
+          <div>
+            <div style={{ fontWeight: 900, marginBottom: 6 }}>Startort</div>
+            <input
+              value={origin}
+              onChange={(e) => setOrigin(e.target.value)}
+              placeholder="t.ex. Stockholm"
+              style={inputStyle}
+            />
+          </div>
 
-            <label>
-              <div style={{ fontWeight: 700, marginBottom: 6 }}>Date (YYYY-MM-DD)</div>
+          <div>
+            <div style={{ fontWeight: 900, marginBottom: 6 }}>Slutort</div>
+            <input
+              value={destination}
+              onChange={(e) => setDestination(e.target.value)}
+              placeholder="t.ex. Uppsala"
+              style={inputStyle}
+            />
+          </div>
+
+          <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+            <div>
+              <div style={{ fontWeight: 900, marginBottom: 6 }}>Datum</div>
               <input
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                placeholder="2025-12-23"
-                style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #ddd" }}
+                placeholder="YYYY-MM-DD"
+                style={inputStyle}
               />
-            </label>
+            </div>
 
-            <label>
-              <div style={{ fontWeight: 700, marginBottom: 6 }}>Time window</div>
+            <div>
+              <div style={{ fontWeight: 900, marginBottom: 6 }}>Tidsfönster</div>
               <input
                 value={timeWindow}
                 onChange={(e) => setTimeWindow(e.target.value)}
-                placeholder="08-12"
-                style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #ddd" }}
+                placeholder="t.ex. 10:00-14:00"
+                style={inputStyle}
               />
-              <div style={{ fontSize: 12, opacity: 0.75, marginTop: 6 }}>
-                Exempel: 08-12 eller 14-18 (valfritt).
-              </div>
-            </label>
+            </div>
 
-            <label>
-              <div style={{ fontWeight: 700, marginBottom: 6 }}>Compensation (SEK)</div>
+            <div>
+              <div style={{ fontWeight: 900, marginBottom: 6 }}>Ersättning (SEK)</div>
               <input
-                type="number"
-                value={compensationSek}
-                onChange={(e) => setCompensationSek(Number(e.target.value))}
-                style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #ddd" }}
+                value={compensation}
+                onChange={(e) => setCompensation(e.target.value)}
+                placeholder="t.ex. 500"
+                inputMode="numeric"
+                style={inputStyle}
               />
-            </label>
-
-            <label>
-              <div style={{ fontWeight: 700, marginBottom: 6 }}>Vehicle info</div>
-              <input
-                value={vehicleInfo}
-                onChange={(e) => setVehicleInfo(e.target.value)}
-                placeholder="Volvo V60"
-                style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #ddd" }}
-              />
-            </label>
-
-            {validationError && (
-              <div style={{ marginTop: 6 }}>
-                <Alert tone="warning">{validationError}</Alert>
-              </div>
-            )}
-
-            <Row style={{ marginTop: 6 }}>
-              <Button
-                onClick={createTrip}
-                loading={busy}
-                disabled={!!validationError}
-              >
-                Skapa trip
-              </Button>
-
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setOrigin("Stockholm");
-                  setDestination("Uppsala");
-                  setDate("2025-12-23");
-                  setTimeWindow("08-12");
-                  setCompensationSek(500);
-                  setVehicleInfo("Volvo V60");
-                  setErr(null);
-                }}
-                disabled={busy}
-              >
-                Reset
-              </Button>
-            </Row>
+            </div>
           </div>
-        </Card>
-      </div>
+
+          <div>
+            <div style={{ fontWeight: 900, marginBottom: 6 }}>Bil</div>
+            <input
+              value={vehicleInfo}
+              onChange={(e) => setVehicleInfo(e.target.value)}
+              placeholder="t.ex. Volvo V70"
+              style={inputStyle}
+            />
+          </div>
+
+          <Row>
+            <Button onClick={onCreate} loading={busy} disabled={!canSubmit}>
+              Skapa körning
+            </Button>
+
+            <Button variant="secondary" onClick={reset} disabled={busy}>
+              Nollställ
+            </Button>
+
+            <Button variant="ghost" onClick={() => nav(-1)} disabled={busy}>
+              Tillbaka
+            </Button>
+          </Row>
+        </div>
+      </Card>
     </Container>
   );
 }

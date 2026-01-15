@@ -48,7 +48,7 @@ export default function Landing({ me }: { me: Me | null }) {
   const canReserve = me?.role === "DRIVER";
 
   async function onReserve(tripId: number) {
-    // om utloggad → till auth och tillbaka till trippen
+    // utloggad → auth och tillbaka till trippen
     if (!getToken()) {
       nav(`/auth?next=/trips/${tripId}`);
       return;
@@ -56,7 +56,7 @@ export default function Landing({ me }: { me: Me | null }) {
 
     // inloggad men fel roll
     if (!canReserve) {
-      setErr("Endast DRIVER kan paxa körningar.");
+      setErr("Endast förare kan paxa körningar.");
       return;
     }
 
@@ -73,16 +73,51 @@ export default function Landing({ me }: { me: Me | null }) {
     }
   }
 
+  const isCompany = me?.role === "COMPANY";
+
+  const inputStyle: React.CSSProperties = {
+    width: "100%",
+    padding: 10,
+    borderRadius: 10,
+    border: "1px solid #ddd",
+    boxSizing: "border-box", // ✅ stoppar “krock/overflow”
+  };
+
   return (
     <Container>
-      {/* HERO / Startsida */}
+      {/* HERO */}
       <Card style={{ padding: 18 }}>
+        {/* CSS för stabil grid (ingen överlapp) */}
+        <style>{`
+          .tmSearchWrap {
+            display: grid;
+            gap: 12px;
+            max-width: 980px;
+          }
+
+          .tmSearchFields {
+            display: grid;
+            grid-template-columns: repeat(12, minmax(0, 1fr));
+            gap: 14px;
+            align-items: start;
+          }
+
+          .tmField {
+            grid-column: span 12;
+            min-width: 0; /* ✅ viktigt för att inputs inte ska “pressa” och överlappa */
+          }
+
+          @media (min-width: 900px) {
+            .tmField--origin { grid-column: span 5; }
+            .tmField--dest   { grid-column: span 5; }
+            .tmField--date   { grid-column: span 2; }
+          }
+        `}</style>
+
         <Row style={{ alignItems: "flex-start" }}>
           <div style={{ minWidth: 0 }}>
             <H1 style={{ marginTop: 0 }}>Transport Match</H1>
-            <Muted>
-              Kopplar företag som behöver fordonstransport med privatpersoner som ändå ska köra samma rutt.
-            </Muted>
+            <Muted>En smart marknadsplats där transportbehov möter resor som redan ska göras.</Muted>
 
             <div style={{ marginTop: 12 }}>
               {!me ? (
@@ -95,15 +130,11 @@ export default function Landing({ me }: { me: Me | null }) {
               ) : (
                 <Row>
                   <Muted>
-                    Inloggad som <b>{me.role}</b>
+                    Inloggad som <b>{isCompany ? "FÖRETAG" : "FÖRARE"}</b>
                   </Muted>
+
                   <Spacer />
-                  <Button
-                    variant="secondary"
-                    onClick={() => nav(me.role === "COMPANY" ? "/create" : "/mine")}
-                  >
-                    Gå vidare →
-                  </Button>
+                  {/* ✅ BORTTAGEN: "Skapa körning"-knappen i kortet (TopNav-knappen är kvar) */}
                 </Row>
               )}
             </div>
@@ -114,43 +145,43 @@ export default function Landing({ me }: { me: Me | null }) {
 
         <Divider />
 
-        {/* SÖK */}
-        <div style={{ display: "grid", gap: 10, maxWidth: 720 }}>
-          <Row>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 700, marginBottom: 6 }}>Origin</div>
+        {/* SÖK (ingen överlapp) */}
+        <div className="tmSearchWrap">
+          <div className="tmSearchFields">
+            <div className="tmField tmField--origin">
+              <div style={{ fontWeight: 800, marginBottom: 6 }}>Startort</div>
               <input
                 value={qOrigin}
                 onChange={(e) => setQOrigin(e.target.value)}
                 placeholder="t.ex. Stockholm"
-                style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #ddd" }}
+                style={inputStyle}
               />
             </div>
 
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 700, marginBottom: 6 }}>Destination</div>
+            <div className="tmField tmField--dest">
+              <div style={{ fontWeight: 800, marginBottom: 6 }}>Slutort</div>
               <input
                 value={qDestination}
                 onChange={(e) => setQDestination(e.target.value)}
                 placeholder="t.ex. Uppsala"
-                style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #ddd" }}
+                style={inputStyle}
               />
             </div>
 
-            <div style={{ width: 180 }}>
-              <div style={{ fontWeight: 700, marginBottom: 6 }}>Date</div>
+            <div className="tmField tmField--date">
+              <div style={{ fontWeight: 800, marginBottom: 6 }}>Datum</div>
               <input
                 value={qDate}
                 onChange={(e) => setQDate(e.target.value)}
                 placeholder="YYYY-MM-DD"
-                style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #ddd" }}
+                style={inputStyle}
               />
             </div>
-          </Row>
+          </div>
 
-          <Row>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <Button variant="secondary" onClick={load} loading={loading}>
-              Uppdatera resor
+              Uppdatera körningar
             </Button>
             <Button
               variant="ghost"
@@ -163,7 +194,7 @@ export default function Landing({ me }: { me: Me | null }) {
             >
               Rensa sök
             </Button>
-          </Row>
+          </div>
         </div>
 
         {err && (
@@ -177,11 +208,12 @@ export default function Landing({ me }: { me: Me | null }) {
       <div style={{ marginTop: 16 }}>
         <Row style={{ marginBottom: 10 }}>
           <div>
-            <div style={{ fontWeight: 900, fontSize: 18 }}>Alla tillgängliga resor</div>
-            <Muted>Visar OPEN-körningar. Klicka på en resa för detaljer.</Muted>
+            <div style={{ fontWeight: 900, fontSize: 18 }}>Öppna körningar</div>
+            <Muted>Klicka på en resa för detaljer.</Muted>
           </div>
+
           <Spacer />
-          <Link to={me ? "/mine" : "/auth?next=/mine"}>Mina körningar</Link>
+          {/* (Mina körningar till höger borttagen) */}
         </Row>
 
         {filtered.length === 0 && !loading ? (

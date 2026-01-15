@@ -45,7 +45,7 @@ def health():
 def signup(payload: UserCreate, session: Session = Depends(get_session)):
     existing = session.exec(select(User).where(User.email == payload.email)).first()
     if existing:
-        raise HTTPException(status_code=400, detail="Email finns redan")
+        raise HTTPException(status_code=400, detail="E-postadressen finns redan")
 
     user = User(
         name=payload.name,
@@ -65,13 +65,16 @@ def signup(payload: UserCreate, session: Session = Depends(get_session)):
 def login(form: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
     user = session.exec(select(User).where(User.email == form.username)).first()
     if not user or not verify_password(form.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Fel email eller lösenord")
+        raise HTTPException(status_code=401, detail="Fel e-post eller lösenord")
 
     token = create_access_token(str(user.id))
     return {"access_token": token, "token_type": "bearer"}
 
 
-def get_current_user(token: str = Depends(oauth2_scheme), session: Session = Depends(get_session)) -> User:
+def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    session: Session = Depends(get_session),
+) -> User:
     try:
         user_id = int(decode_token(token))
     except Exception:
@@ -84,7 +87,10 @@ def get_current_user(token: str = Depends(oauth2_scheme), session: Session = Dep
     return user
 
 
-def get_optional_user(token: Optional[str] = Depends(oauth2_optional), session: Session = Depends(get_session)) -> Optional[User]:
+def get_optional_user(
+    token: Optional[str] = Depends(oauth2_optional),
+    session: Session = Depends(get_session),
+) -> Optional[User]:
     if not token:
         return None
     try:
@@ -136,14 +142,14 @@ def reserve_trip(
     session: Session = Depends(get_session),
 ):
     if user.role != UserRole.DRIVER:
-        raise HTTPException(status_code=403, detail="Endast drivers kan paxa körningar")
+        raise HTTPException(status_code=403, detail="Endast förare kan paxa körningar")
 
     trip = session.get(Trip, trip_id)
     if not trip:
-        raise HTTPException(status_code=404, detail="Trip finns inte")
+        raise HTTPException(status_code=404, detail="Körningen finns inte")
 
     if trip.status != TripStatus.OPEN:
-        raise HTTPException(status_code=400, detail="Trip är inte ledig")
+        raise HTTPException(status_code=400, detail="Körningen är inte öppen")
 
     try:
         res = Reservation(trip_id=trip_id, driver_id=user.id)
@@ -156,7 +162,93 @@ def reserve_trip(
         return {"ok": True, "trip_id": trip_id, "driver_id": user.id}
     except IntegrityError:
         session.rollback()
-        raise HTTPException(status_code=400, detail="Trip är redan paxad")
+        raise HTTPException(status_code=400, detail="Körningen är redan paxad")
+
+
+@app.delete("/trips/{trip_id}/reserve")
+def unreserve_trip(
+    trip_id: int,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    if user.role != UserRole.DRIVER:
+        raise HTTPException(status_code=403, detail="Endast förare kan avboka paxning")
+
+    trip = session.get(Trip, trip_id)
+    if not trip:
+        raise HTTPException(status_code=404, detail="Körningen finns inte")
+
+    if trip.status != TripStatus.RESERVED:
+        raise HTTPException(status_code=400, detail="Körningen är inte reserverad")
+
+    res = session.exec(
+        select(Reservation).where(
+            Reservation.trip_id == trip_id,
+            Reservation.driver_id == user.id,
+        )
+    ).first()
+
+    if not res:
+        raise HTTPException(status_code=403, detail="Du har inte paxat denna körning")
+
+    session.delete(res)
+    trip.status = TripStatus.OPEN
+    session.add(trip)
+    session.commit()
+
+    return {"ok": True, "trip_id": trip_id, "status": trip.status}
+
+
+@app.post("/trips/{trip_id}/cancel")
+def cancel_trip(
+    trip_id: int,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    if user.role != UserRole.COMPANY:
+        raise HTTPException(status_code=403, detail="Endast företag kan avboka körningar")
+
+    trip = session.get(Trip, trip_id)
+    if not trip:
+        raise HTTPException(status_code=404, detail="Körningen finns inte")
+
+    if trip.company_id != user.id:
+        raise HTTPException(status_code=403, detail="Du äger inte denna körning")
+
+    if trip.status not in (TripStatus.OPEN, TripStatus.RESERVED):
+        raise HTTPException(status_code=400, detail="Körningen kan inte avbokas i nuvarande status")
+
+    trip.status = TripStatus.CANCELLED
+    session.add(trip)
+    session.commit()
+
+    return {"ok": True, "trip_id": trip_id, "status": trip.status}
+
+
+@app.post("/trips/{trip_id}/complete")
+def complete_trip(
+    trip_id: int,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    if user.role != UserRole.COMPANY:
+        raise HTTPException(status_code=403, detail="Endast företag kan markera körningar som klara")
+
+    trip = session.get(Trip, trip_id)
+    if not trip:
+        raise HTTPException(status_code=404, detail="Körningen finns inte")
+
+    if trip.company_id != user.id:
+        raise HTTPException(status_code=403, detail="Du äger inte denna körning")
+
+    if trip.status != TripStatus.RESERVED:
+        raise HTTPException(status_code=400, detail="Endast reserverade körningar kan markeras som klara")
+
+    trip.status = TripStatus.COMPLETED
+    session.add(trip)
+    session.commit()
+
+    return {"ok": True, "trip_id": trip_id, "status": trip.status}
 
 
 @app.get("/trips/mine", response_model=List[TripPublic])
@@ -179,7 +271,7 @@ def my_trips(
     return [TripPublic(**t.model_dump()) for t in trips]
 
 
-# ✅ NU: Trip detail kan öppnas utan login
+# Trip detail kan öppnas utan login
 @app.get("/trips/{trip_id}", response_model=TripDetailPublic)
 def get_trip(
     trip_id: int,
@@ -188,13 +280,13 @@ def get_trip(
 ):
     trip = session.get(Trip, trip_id)
     if not trip:
-        raise HTTPException(status_code=404, detail="Trip finns inte")
+        raise HTTPException(status_code=404, detail="Körningen finns inte")
 
     reserved_driver = None
     if trip.status == TripStatus.RESERVED:
         res = session.exec(select(Reservation).where(Reservation.trip_id == trip_id)).first()
 
-        # Bara företaget som äger trippen får se vem som paxat
+        # Bara företaget som äger körningen får se vem som paxat
         if res and user and user.role == UserRole.COMPANY and trip.company_id == user.id:
             driver = session.get(User, res.driver_id)
             if driver:

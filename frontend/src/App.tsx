@@ -9,16 +9,27 @@ import MyTrips from "./pages/MyTrips";
 import TripDetailPage from "./pages/TripDetail";
 import Faq from "./pages/Faq";
 
+function roleLabel(role: UserRole) {
+  return role === "COMPANY" ? "FÖRETAG" : "FÖRARE";
+}
+
 function Logo() {
   return (
     <Link to="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
-      <div
+      <img
+        src="/logo.png"
+        alt="Transport Match"
         style={{
           width: 34,
           height: 34,
+          objectFit: "contain",
           borderRadius: 10,
-          background: "linear-gradient(135deg, #0ea5e9, #22c55e)",
           boxShadow: "0 10px 24px rgba(0,0,0,0.14)",
+          background: "white",
+        }}
+        onError={(e) => {
+          // fallback om logo.png saknas
+          (e.currentTarget as HTMLImageElement).style.display = "none";
         }}
       />
       <span style={{ fontWeight: 900, letterSpacing: 0.2, color: "#0f172a" }}>Transport Match</span>
@@ -87,7 +98,7 @@ function TopNav({ me, onLogout }: { me: Me | null; onLogout: () => void }) {
         {me ? (
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ fontSize: 13, color: "rgba(15,23,42,0.75)" }}>
-              {me.name} • <b style={{ color: "#0f172a" }}>{me.role}</b>
+              {me.name} • <b style={{ color: "#0f172a" }}>{roleLabel(me.role)}</b>
             </span>
 
             {me.role === "COMPANY" && (
@@ -96,11 +107,11 @@ function TopNav({ me, onLogout }: { me: Me | null; onLogout: () => void }) {
                 style={{
                   textDecoration: "none",
                   fontWeight: 900,
-                  color: "#0f172a",
+                  color: "white",
                   padding: "10px 14px",
                   borderRadius: 14,
-                  background: "rgba(15,23,42,0.06)",
-                  boxShadow: "0 10px 22px rgba(0,0,0,0.08)",
+                  background: "#0f172a", // samma som Logga in
+                  boxShadow: "0 14px 28px rgba(15,23,42,0.18)",
                 }}
               >
                 Skapa körning
@@ -112,7 +123,8 @@ function TopNav({ me, onLogout }: { me: Me | null; onLogout: () => void }) {
               style={{
                 cursor: "pointer",
                 border: "1px solid rgba(15,23,42,0.12)",
-                background: "white",
+                background: me?.role === "DRIVER" ? "#0f172a" : "white",
+                color: me?.role === "DRIVER" ? "white" : "#0f172a",
                 padding: "10px 14px",
                 borderRadius: 14,
                 fontWeight: 900,
@@ -205,13 +217,11 @@ export default function App() {
 
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "22px 16px" }}>
         <Routes>
-          {/* ✅ Home + Explore i samma sida */}
           <Route path="/" element={<Landing me={me} />} />
 
           {/* Auth sköter redirect själv (next/from) */}
           <Route path="/auth" element={<Auth onAuthed={(m) => setMe(m)} />} />
 
-          {/* Skyddade routes */}
           <Route
             path="/mine"
             element={
@@ -230,15 +240,13 @@ export default function App() {
             }
           />
 
-          {/* Publik: Trip detail */}
           <Route path="/trips/:id" element={<TripDetailPage me={me} />} />
 
           <Route path="/faq" element={<Faq />} />
 
-          {/* ✅ Backwards compat: /explore → / */}
+          {/* Om någon gammal länk finns kvar */}
           <Route path="/explore" element={<Navigate to="/" replace />} />
 
-          {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
